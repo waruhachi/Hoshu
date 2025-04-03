@@ -111,16 +111,31 @@ I_N_T() {
     return 0
 }
 
-exclude_files=("*.lproj/*" "*.png" "*.gif" "*.jpg" "*.jpeg" "*.svg" "*.strings" "*.lua" "*.js" "*.py" "*.h" "*.json" "*.txt" "*.xml")
+exclude_files=(
+    \! -path "*.lproj/*"
+    \! -path "*.png"
+    \! -path "*.gif"
+    \! -path "*.jpg"
+    \! -path "*.jpeg"
+    \! -path "*.svg"
+    \! -path "*.strings"
+    \! -path "*.js"
+    \! -path "*.py"
+    \! -path "*.h"
+    \! -path "*.json"
+    \! -path "*.txt"
+    \! -path "*.xml"
+    \( \! -path "*.lua" -o -name "EQE.lua" \)
+)
 
 ### Derootifier Script ##################################
 Derootifier() {
 
     mv -f "$TEMPDIR_OLD"/* "$TEMPDIR_NEW"/
     
-    findcmd=(find "$TEMPDIR_NEW" -type f -size +0c \! -path "*/var/mobile/Library/pkgmirror/*")
+    findcmd=(find "$TEMPDIR_NEW" -type f -size +0c)
     for item in "${exclude_files[@]}"; do
-        findcmd+=( \! -path "$item" )
+        findcmd+=( $item )
     done
 
     "${findcmd[@]}" | while read -r file; do
@@ -236,7 +251,7 @@ lsrpath() {
 
 findcmd=(find "$TEMPDIR_NEW" -type f -size +0c \! -path "*/var/mobile/Library/pkgmirror/*")
 for item in "${exclude_files[@]}"; do
-    findcmd+=( \! -path "$item" )
+    findcmd+=( $item )
 done
 
 "${findcmd[@]}" | while read -r file; do

@@ -47,6 +47,9 @@ struct ContentView: View {
                 }
                 .buttonStyle(TintedButton(color: .white, fullwidth: true))
                 .padding(5)
+                .padding(.leading, 50)
+                .padding(.trailing, 50)
+                .opacity(selectedFile==nil ? 1 : 0.5)
                 
                 if let debfile = selectedFile {
                     Button("Convert .deb") {
@@ -60,7 +63,13 @@ struct ContentView: View {
                             
                             var patch=""
                             if usingRootlessCompat { patch="AutoPatches" } else if requireDynamicPatches { patch="DynamicPatches" }
+                            DispatchQueue.main.async {
+                                UIApplication.shared.isIdleTimerDisabled = true
+                            }
                             let (exitCode,outputAux) = repackDeb(scriptPath: scriptPath, debURL: debfile, outputURL: output, patch: patch)
+                            DispatchQueue.main.async {
+                                UIApplication.shared.isIdleTimerDisabled = false
+                            }
                             
                             DispatchQueue.main.async {
                                 UIApplication.shared.dismissAlert(animated: false) {
