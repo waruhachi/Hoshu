@@ -8,7 +8,7 @@
 import Foundation
 import UIKit
 
-func repackDeb(debURL: URL) -> (Int, String) {
+func rootlessPatcher(debURL: URL) -> (Int, String) {
     var output = ""
     let command = jbroot("/usr/local/bin/rootless-patcher")
     let env: [String: String] = [

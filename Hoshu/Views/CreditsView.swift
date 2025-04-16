@@ -9,21 +9,13 @@ import FluidGradient
 import SwiftUI
 
 struct CreditsView: View {
+    @Environment(\.presentationMode) var presentationMode
+
     init() {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithTransparentBackground()
         appearance.titleTextAttributes = [.foregroundColor: UIColor.white]
         appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.white]
-        appearance.backButtonAppearance.normal.titleTextAttributes = [
-            .foregroundColor: UIColor.white
-        ]
-
-        // Set the back button image color
-        let backButtonImage = UIImage(systemName: "chevron.left")?
-            .withTintColor(
-                .white, renderingMode: .alwaysOriginal)
-        appearance.setBackIndicatorImage(
-            backButtonImage, transitionMaskImage: backButtonImage)
 
         UINavigationBar.appearance().standardAppearance = appearance
         UINavigationBar.appearance().compactAppearance = appearance
@@ -32,47 +24,55 @@ struct CreditsView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .center) {
-            FluidGradient(
-                blobs: [.black, .white],
-                highlights: [.black, .white],
-                speed: 0.5,
-                blur: 0.80
-            )
-            .background(.black)
-            .ignoresSafeArea()
+        NavigationView {
+            ZStack(alignment: .center) {
+                FluidGradient(
+                    blobs: [.black, .white],
+                    highlights: [.black, .white],
+                    speed: 0.5,
+                    blur: 0.80
+                )
+                .background(.black)
+                .ignoresSafeArea()
 
-            ScrollView {
-                VStack {
-                    creditView(
-                        imageURL: URL(
-                            string:
-                                "https://avatars.githubusercontent.com/u/156133757"
-                        ), name: "waruhachi", description: "Made Hoshu")
-                    creditView(
-                        imageURL: URL(
-                            string:
-                                "https://avatars.githubusercontent.com/u/81449663"
-                        ), name: "NightwindDev",
-                        description: "Made rootless-patcher")
-                    creditView(
-                        imageURL: URL(
-                            string:
-                                "https://avatars.githubusercontent.com/u/134120506"
-                        ), name: "roothide",
-                        description: "Made RoothidePatcher")
-                    creditView(
-                        imageURL: URL(
-                            string:
-                                "https://avatars.githubusercontent.com/u/85764897"
-                        ), name: "haxi0", description: "Made Derootifier")
+                ScrollView {
+                    VStack {
+                        creditView(
+                            imageURL: URL(
+                                string:
+                                    "https://avatars.githubusercontent.com/u/156133757"
+                            ), name: "waruhachi", description: "Made Hoshu")
+                        creditView(
+                            imageURL: URL(
+                                string:
+                                    "https://avatars.githubusercontent.com/u/81449663"
+                            ), name: "NightwindDev",
+                            description: "Made rootless-patcher")
+                        creditView(
+                            imageURL: URL(
+                                string:
+                                    "https://avatars.githubusercontent.com/u/134120506"
+                            ), name: "roothide",
+                            description: "Made RoothidePatcher")
+                        creditView(
+                            imageURL: URL(
+                                string:
+                                    "https://avatars.githubusercontent.com/u/85764897"
+                            ), name: "haxi0", description: "Made Derootifier")
+                    }
+                    .padding()
                 }
                 .padding()
+                .listStyle(.insetGrouped)
             }
-            .padding()
-            .listStyle(.insetGrouped)
+            .navigationBarTitle("Credits", displayMode: .inline)
+            .navigationBarItems(
+                trailing: Button("Done") {
+                    presentationMode.wrappedValue.dismiss()
+                }
+                .foregroundColor(.white)
+            )
         }
-        .navigationBarTitleDisplayMode(.inline)
     }
 
     private func creditView(imageURL: URL?, name: String, description: String)

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2837E4562DB0047000023713 /* FilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2837E4552DB0046E00023713 /* FilterView.swift */; };
 		6DCF8E3429EA9E6F00D55A37 /* HoshuApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCF8E3329EA9E6F00D55A37 /* HoshuApp.swift */; };
 		6DCF8E3629EA9E6F00D55A37 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCF8E3529EA9E6F00D55A37 /* ContentView.swift */; };
 		6DCF8E3829EA9E7100D55A37 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6DCF8E3729EA9E7100D55A37 /* Assets.xcassets */; };
@@ -28,6 +29,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		2837E4552DB0046E00023713 /* FilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterView.swift; sourceTree = "<group>"; };
 		6DCF8E3029EA9E6F00D55A37 /* Hoshu.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Hoshu.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6DCF8E3329EA9E6F00D55A37 /* HoshuApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HoshuApp.swift; sourceTree = "<group>"; };
 		6DCF8E3529EA9E6F00D55A37 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -138,6 +140,7 @@
 		6DE2082829EB30DC0053E93D /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				2837E4552DB0046E00023713 /* FilterView.swift */,
 				6DCF8E3529EA9E6F00D55A37 /* ContentView.swift */,
 				6DE2083129EB46850053E93D /* DocumentPicker.swift */,
 				6DE2088B29F591160053E93D /* CreditsView.swift */,
@@ -234,6 +237,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2837E4562DB0047000023713 /* FilterView.swift in Sources */,
 				842F70872ACEC1C7002E5574 /* AuxiliaryExecute+Spawn.swift in Sources */,
 				842F70852ACEC1C3002E5574 /* AuxiliaryExecute+Shell.swift in Sources */,
 				842F70832ACEC1BF002E5574 /* AuxiliaryExecute+Async.swift in Sources */,

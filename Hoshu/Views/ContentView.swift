@@ -11,6 +11,9 @@ import SwiftUI
 struct ContentView: View {
     @State private var selectedFile: URL?
     @State private var showingSheet = false
+    @State private var showFilterSheet = false
+    @State private var showCreditsSheet = false
+    @State private var filterType: FilterType = .all
 
     var body: some View {
 
@@ -51,20 +54,40 @@ struct ContentView: View {
                             withButton: false)
 
                         DispatchQueue.global().async {
-                            let name = selectedFile!.deletingPathExtension()
-                                .lastPathComponent.replacingOccurrences(
-                                    of: "iphoneos-arm", with: "iphoneos-arm64"
-                                )
+                            // Determine if we're converting to rootful or rootless based on the file and filter
+                            let filename = selectedFile!.lastPathComponent
+                            let isRootful =
+                                filename.contains("iphoneos-arm")
+                                && !filename.contains("iphoneos-arm64")
+                            let outputName: String
+
+                            // Apply conversion based on filter type
+                            if filterType == .rootless && isRootful {
+                                // Convert rootful to rootless
+                                outputName = selectedFile!.deletingPathExtension()
+                                    .lastPathComponent.replacingOccurrences(
+                                        of: "iphoneos-arm", with: "iphoneos-arm64"
+                                    )
+                            } else if filterType == .rootful && !isRootful {
+                                // Convert rootless to rootful
+                                outputName = selectedFile!.deletingPathExtension()
+                                    .lastPathComponent.replacingOccurrences(
+                                        of: "iphoneos-arm64", with: "iphoneos-arm"
+                                    )
+                            } else {
+                                // Keep original format
+                                outputName = selectedFile!.deletingPathExtension().lastPathComponent
+                            }
 
                             let output = URL.init(
-                                fileURLWithPath: "/var/mobile/Hoshu/\(name).deb"
+                                fileURLWithPath: "/var/mobile/Hoshu/\(outputName).deb"
                             )
 
                             DispatchQueue.main.async {
                                 UIApplication.shared.isIdleTimerDisabled = true
                             }
 
-                            let (exitCode, outputText) = repackDeb(
+                            let (exitCode, outputText) = rootlessPatcher(
                                 debURL: selectedFile!
                             )
 
@@ -166,12 +189,33 @@ struct ContentView: View {
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: CreditsView()) {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: {
+                        showCreditsSheet.toggle()
+                    }) {
                         Image(systemName: "info.circle")
                             .foregroundColor(.white)
                     }
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: {
+                        // Show filter sheet
+                        showFilterSheet.toggle()
+                    }) {
+                        Image(systemName: "folder")
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+            .sheet(isPresented: $showFilterSheet) {
+                FilterView(filterType: $filterType)
+                    .edgesIgnoringSafeArea(.all)
+                    .modifier(SheetPresentationModifier())
+            }
+            .sheet(isPresented: $showCreditsSheet) {
+                CreditsView()
+                    .edgesIgnoringSafeArea(.all)
+                    .modifier(SheetPresentationModifier())
             }
         }
     }
@@ -183,8 +227,7 @@ struct SheetPresentationModifier: ViewModifier {
         if #available(iOS 16.0, *) {
             content
                 .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .interactiveDismissDisabled()
+            // .interactiveDismissDisabled()
         } else {
             content
         }
@@ -195,4 +238,8 @@ struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
     }
+}
+
+enum FilterType {
+    case all, rootful, rootless
 }
