@@ -1,25 +1,18 @@
 ARCHS = arm64
-TARGET = iphone:latest:15.0
-DEB_ARCH = iphoneos-arm64e
+TARGET = iphone:16.5:14.0
+# DEB_ARCH = iphoneos-arm64
+INSTALL_TARGET_PROCESSES = Hoshu
 IPHONEOS_DEPLOYMENT_TARGET = 15.0
-
-INSTALL_TARGET_PROCESSES = Patcher
-
-THEOS_PACKAGE_SCHEME = roothide
 
 include $(THEOS)/makefiles/common.mk
 
-XCODE_SCHEME = RootHidePatcher
+XCODE_SCHEME = Hoshu
+XCODEPROJ_NAME = Hoshu
 
-XCODEPROJ_NAME = RootHidePatcher
-
-RootHidePatcher_XCODEFLAGS = MARKETING_VERSION=$(THEOS_PACKAGE_BASE_VERSION) \
-	IPHONEOS_DEPLOYMENT_TARGET="$(IPHONEOS_DEPLOYMENT_TARGET)" \
-	CODE_SIGN_IDENTITY="" \
-	AD_HOC_CODE_SIGNING_ALLOWED=YES
-RootHidePatcher_XCODE_SCHEME = $(XCODE_SCHEME)
-RootHidePatcher_CODESIGN_FLAGS = -Sentitlements.plist
-RootHidePatcher_INSTALL_PATH = /Applications
+$(XCODEPROJ_NAME)_XCODEFLAGS = MARKETING_VERSION=$(THEOS_PACKAGE_BASE_VERSION) IPHONEOS_DEPLOYMENT_TARGET="$(IPHONEOS_DEPLOYMENT_TARGET)" CODE_SIGN_IDENTITY="" AD_HOC_CODE_SIGNING_ALLOWED=YES
+$(XCODEPROJ_NAME)_XCODE_SCHEME = $(XCODE_SCHEME)
+$(XCODEPROJ_NAME)_CODESIGN_FLAGS = -Sentitlements.plist
+$(XCODEPROJ_NAME)_INSTALL_PATH = /Applications
 
 include $(THEOS_MAKE_PATH)/xcodeproj.mk
 
@@ -28,4 +21,4 @@ clean::
 
 
 after-install::
-	install.exec 'uiopen -b com.roothide.patcher'
+	install.exec 'uiopen -b moe.waru.hoshu'

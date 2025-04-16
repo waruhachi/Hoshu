@@ -9,8 +9,7 @@
 #ifndef AppFileShare_h
 #define AppFileShare_h
 
-BOOL IsAppAvailable(NSString* bundleId);
-
-BOOL ShareFileToApp(NSString* bundleId, NSString* path);
+BOOL IsAppAvailable(NSString *bundleId);
+BOOL ShareFileToApp(NSString *bundleId, NSString *path);
 
 #endif /* AppFileShare_h */

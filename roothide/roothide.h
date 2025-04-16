@@ -2,49 +2,50 @@
 #define ROOTHIDE_H
 
 #pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
 #pragma GCC diagnostic ignored "-Wnullability-completeness"
 
 #include <string.h>
+#include <unistd.h>
 
 #ifdef __cplusplus
 #include <string>
 #endif
 
 #ifdef __OBJC__
-#import <Foundation/NSString.h>
+#import <Foundation/Foundation.h>
 #endif
+
+// stub functions
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-const char* rootfs_alloc(const char* path);  /* free after use */
-const char* jbroot_alloc(const char* path); /* free after use */
-const char* jbrootat_alloc(int fd, const char* path); /* free after use */
-
-//
-
-/* get the system-wide random value of current jailbreak state */
-unsigned long long jbrand();
-
-/* convert jbroot-based path to rootfs-based path (auto cache) */
-const char* jbroot(const char* path);
-
-/* convert rootfs-based path to jbroot-based path (auto cache) */
-const char* rootfs(const char* path);
+static unsigned long long jbrand() { return 0; }
+static const char *jbroot(const char *path) {
+  if (!path || !*path || path[0] != '/') {
+    return path;
+  }
+  static char __thread buffer[PATH_MAX];
+  snprintf(buffer, sizeof(buffer), "/var/jb%s", path);
+  return buffer;
+}
+static const char *rootfs(const char *path) { return path; }
 
 #ifdef __OBJC__
-NSString* _Nonnull __attribute__((overloadable)) jbroot(NSString* _Nonnull path);
-NSString* _Nonnull __attribute__((overloadable)) rootfs(NSString* _Nonnull path);
-#endif
-
-#ifdef __cplusplus
+static NSString *_Nonnull __attribute__((overloadable))
+jbroot(NSString *_Nonnull path) {
+  return [@"/var/jb" stringByAppendingPathComponent:path];
+}
+static NSString *_Nonnull __attribute__((overloadable))
+rootfs(NSString *_Nonnull path) {
+  return path;
 }
 #endif
 
 #ifdef __cplusplus
-std::string jbroot(std::string path);
-std::string rootfs(std::string path);
+}
 #endif
 
 #pragma GCC diagnostic pop

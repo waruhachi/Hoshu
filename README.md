@@ -1,6 +1,6 @@
-<img src="derootifier-2-modified.png" alt="Logo" width="70" height="70">
+<img src="Hoshu.png" alt="Logo" width="70" height="70">
 
-# RootHidePatcher
+# Hoshu
 
 patch rootless package to roothide, not work for all packages. in progress...
 

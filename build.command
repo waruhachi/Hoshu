@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 WORKING_LOCATION="$(pwd)"
-APPLICATION_NAME=Derootifier
+APPLICATION_NAME=Hoshu
 rm -rf build
 mkdir build
 
@@ -34,9 +34,9 @@ fi
 
 ldid -S"$WORKING_LOCATION/entitlements.plist" "$TARGET_APP/$APPLICATION_NAME"
 mkdir Payload
-cp -r Derootifier.app Payload/Derootifier.app
-zip -vr Derootifier.ipa Payload
-rm -rf Derootifier.app
+cp -r Hoshu.app Payload/Hoshu.app
+zip -vr Hoshu.ipa Payload
+rm -rf Hoshu.app
 rm -rf DerivedDataApp
 rm -rf Payload
-zip -vr share.zip Derootifier.ipa
+zip -vr share.zip Hoshu.ipa
