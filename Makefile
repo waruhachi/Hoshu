@@ -1,6 +1,5 @@
 ARCHS = arm64
 TARGET = iphone:16.5:14.0
-# DEB_ARCH = iphoneos-arm64
 INSTALL_TARGET_PROCESSES = Hoshu
 IPHONEOS_DEPLOYMENT_TARGET = 15.0
 
@@ -18,7 +17,6 @@ include $(THEOS_MAKE_PATH)/xcodeproj.mk
 
 clean::
 	rm -rf ./packages/*
-
 
 after-install::
 	install.exec 'uiopen -b moe.waru.hoshu'

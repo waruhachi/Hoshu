@@ -27,8 +27,8 @@ struct CreditsView: View {
         NavigationView {
             ZStack(alignment: .center) {
                 FluidGradient(
-                    blobs: [.black, .white],
-                    highlights: [.black, .white],
+                    blobs: [.black],
+                    highlights: [Color(red: 36 / 255, green: 36 / 255, blue: 36 / 255)],
                     speed: 0.5,
                     blur: 0.80
                 )

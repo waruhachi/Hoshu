@@ -20,6 +20,10 @@ struct DocumentPicker: UIViewControllerRepresentable {
         ])
         picker.allowsMultipleSelection = false
         picker.delegate = context.coordinator
+
+        // Override document picker appearance to ensure appropriate text colors
+        picker.overrideUserInterfaceStyle = .light
+
         return picker
     }
 

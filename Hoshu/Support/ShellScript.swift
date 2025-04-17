@@ -22,10 +22,22 @@ func rootlessPatcher(debURL: URL) -> (Int, String) {
         command: command,
         args: args,
         environment: env,
-        output: { output += $0 }
+        output: { outputLine in
+            // Only post a notification for real-time updates, don't append to output
+            // since ContentView is already collecting the output via the notification
+            DispatchQueue.main.async {
+                NotificationCenter.default.post(
+                    name: Notification.Name("terminalOutputUpdate"),
+                    object: outputLine
+                )
+            }
+
+            // Still collect output for the return value
+            output += outputLine
+        }
     )
 
-    // If the conversion was successful, set permissions and ownership on the output file
+    // If the Script was successful, set permissions and ownership on the output file
     if receipt.exitCode == 0 {
         let name = debURL.deletingPathExtension()
             .lastPathComponent.replacingOccurrences(
@@ -39,7 +51,18 @@ func rootlessPatcher(debURL: URL) -> (Int, String) {
             command: jbroot("/usr/bin/chmod"),
             args: ["0755", outputPath],
             environment: env,
-            output: { output += $0 }
+            output: {
+                let outputLine = $0
+                output += outputLine
+
+                // Post notification for chmod output as well
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: Notification.Name("terminalOutputUpdate"),
+                        object: outputLine
+                    )
+                }
+            }
         )
 
         // Set file ownership to 501:501
@@ -47,7 +70,18 @@ func rootlessPatcher(debURL: URL) -> (Int, String) {
             command: jbroot("/usr/bin/chown"),
             args: ["501:501", outputPath],
             environment: env,
-            output: { output += $0 }
+            output: {
+                let outputLine = $0
+                output += outputLine
+
+                // Post notification for chown output as well
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: Notification.Name("terminalOutputUpdate"),
+                        object: outputLine
+                    )
+                }
+            }
         )
     }
 
@@ -59,7 +93,7 @@ func folderCheck() {
         if FileManager.default.fileExists(
             atPath: jbroot("/var/mobile/Hoshu"))
         {
-            print("We're good! :)")
+            NSLog("[Hoshu] We're good! :)")
         } else {
             try FileManager.default.createDirectory(
                 atPath: jbroot("/var/mobile/Hoshu"),
