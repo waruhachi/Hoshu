@@ -79,14 +79,17 @@ struct ContentView: View {
                                         DispatchQueue.main.async {
                                             self.terminalOutput +=
                                                 "\n❌ Error: Script failed with exit code \(exitCode)\n"
-                                            self.selectedFile = nil
                                             let errorAlert = UIAlertController(
                                                 title: "Error",
                                                 message:
                                                     "Conversion failed with exit code \(exitCode)",
                                                 preferredStyle: .alert)
                                             errorAlert.addAction(
-                                                UIAlertAction(title: "OK", style: .default))
+                                                UIAlertAction(
+                                                    title: "OK", style: .default,
+                                                    handler: { _ in
+                                                        self.selectedFile = nil
+                                                    }))
                                             UIApplication.shared.present(alert: errorAlert)
                                         }
                                         return
@@ -94,11 +97,6 @@ struct ContentView: View {
                                     UserDefaults.standard.set(
                                         output.path, forKey: "lastConvertedFilePath")
                                     UserDefaults.standard.set(true, forKey: "ScriptCompleted")
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                        if self.showTerminalSheet {
-                                            self.showTerminalSheet = false
-                                        }
-                                    }
                                 }
                             }
                         } else {
@@ -121,14 +119,17 @@ struct ContentView: View {
                                     if exitCode != 0 {
                                         self.terminalOutput +=
                                             "\n❌ Error: Script failed with exit code \(exitCode)\n"
-                                        self.selectedFile = nil
                                         let errorAlert = UIAlertController(
                                             title: "Error",
                                             message:
                                                 "Conversion failed with exit code \(exitCode)",
                                             preferredStyle: .alert)
                                         errorAlert.addAction(
-                                            UIAlertAction(title: "OK", style: .default))
+                                            UIAlertAction(
+                                                title: "OK", style: .default,
+                                                handler: { _ in
+                                                    self.selectedFile = nil
+                                                }))
                                         UIApplication.shared.present(alert: errorAlert)
                                         return
                                     }
@@ -271,9 +272,12 @@ struct ContentView: View {
             .sheet(
                 isPresented: $showTerminalSheet,
                 onDismiss: {
-                    // Check if Script completed successfully
                     if UserDefaults.standard.bool(forKey: "ScriptCompleted") {
                         handleScriptCompletion()
+                    } else if retroTerminal
+                        && terminalOutput.contains("❌ Error: Script failed with exit code")
+                    {
+                        selectedFile = nil
                     }
                 }
             ) {
@@ -357,6 +361,24 @@ struct ContentView: View {
                         UIImpactFeedbackGenerator(
                             style: .soft
                         ).impactOccurred()
+
+                        let activity = UIActivityViewController(
+                            activityItems: [URL(fileURLWithPath: outputPath)],
+                            applicationActivities: nil)
+
+                        let window = UIApplication.shared.connectedScenes
+                            .first(where: { $0 is UIWindowScene })
+                            .flatMap({ $0 as? UIWindowScene })?.windows.first
+
+                        // don't touch this for ipad
+                        activity.popoverPresentationController?.sourceView = window
+                        activity.popoverPresentationController?.sourceRect = CGRect(
+                            x: window?.bounds.midX ?? 0, y: window?.bounds.height ?? 0, width: 0,
+                            height: 0)
+                        activity.popoverPresentationController?.permittedArrowDirections =
+                            UIPopoverArrowDirection.down
+
+                        UIApplication.shared.present(alert: activity)
                     }))
 
             // Ensure we present on the main thread after a slight delay

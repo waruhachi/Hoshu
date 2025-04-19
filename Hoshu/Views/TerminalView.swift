@@ -111,7 +111,7 @@ struct TerminalView: View {
                                         ? .system(size: 15, weight: .medium, design: .monospaced)
                                         : .system(.footnote, design: .monospaced)
                                 )
-                                .lineSpacing(retroStyle ? 3 : 1)  // Increased line spacing for retro look
+                                .lineSpacing(retroStyle ? 3 : 1)
                                 .foregroundColor(textColor)
                                 .modifier(textEffect)
                                 .padding(.horizontal)
@@ -126,6 +126,11 @@ struct TerminalView: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .onChange(of: outputText) { _ in
+                                withAnimation {
+                                    scrollView.scrollTo("outputEnd", anchor: .bottom)
+                                }
+                            }
                             .onReceive(
                                 NotificationCenter.default.publisher(
                                     for: Notification.Name("terminalOutputUpdate"))
@@ -138,6 +143,7 @@ struct TerminalView: View {
                             }
                         }
                     }
+                    .frame(minHeight: 200)
 
                     if isProcessing {
                         HStack {}

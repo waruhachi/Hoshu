@@ -11,7 +11,7 @@
 #include <spawn.h>
 #include <Foundation/Foundation.h>
 
-#include "roothide.h"
+//#include "roothide.h"
 #include "AppFileShare.h"
 
 #define POSIX_SPAWN_PERSONA_FLAGS_OVERRIDE 1

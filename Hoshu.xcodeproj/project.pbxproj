@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		2837E45A2DB0744E00023713 /* TerminalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2837E4592DB0744C00023713 /* TerminalView.swift */; };
+		28395E802DB409550086617A /* AuxiliaryExecute in Frameworks */ = {isa = PBXBuildFile; productRef = 28395E7F2DB409550086617A /* AuxiliaryExecute */; };
 		6DCF8E3429EA9E6F00D55A37 /* HoshuApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCF8E3329EA9E6F00D55A37 /* HoshuApp.swift */; };
 		6DCF8E3629EA9E6F00D55A37 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DCF8E3529EA9E6F00D55A37 /* ContentView.swift */; };
 		6DCF8E3829EA9E7100D55A37 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6DCF8E3729EA9E7100D55A37 /* Assets.xcassets */; };
@@ -61,6 +62,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6DE2089929F5B80A0053E93D /* FluidGradient in Frameworks */,
+				28395E802DB409550086617A /* AuxiliaryExecute in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -172,6 +174,7 @@
 			name = Hoshu;
 			packageProductDependencies = (
 				6DE2089829F5B80A0053E93D /* FluidGradient */,
+				28395E7F2DB409550086617A /* AuxiliaryExecute */,
 			);
 			productName = Hoshu;
 			productReference = 6DCF8E3029EA9E6F00D55A37 /* Hoshu.app */;
@@ -203,6 +206,7 @@
 			mainGroup = 6DCF8E2729EA9E6F00D55A37;
 			packageReferences = (
 				6DE2089729F5B80A0053E93D /* XCRemoteSwiftPackageReference "FluidGradient" */,
+				28395E7E2DB409550086617A /* XCRemoteSwiftPackageReference "AuxiliaryExecute" */,
 			);
 			productRefGroup = 6DCF8E3129EA9E6F00D55A37 /* Products */;
 			projectDirPath = "";
@@ -485,6 +489,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		28395E7E2DB409550086617A /* XCRemoteSwiftPackageReference "AuxiliaryExecute" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/Lakr233/AuxiliaryExecute";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.1.0;
+			};
+		};
 		6DE2089729F5B80A0053E93D /* XCRemoteSwiftPackageReference "FluidGradient" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/Cindori/FluidGradient";
@@ -496,6 +508,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		28395E7F2DB409550086617A /* AuxiliaryExecute */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 28395E7E2DB409550086617A /* XCRemoteSwiftPackageReference "AuxiliaryExecute" */;
+			productName = AuxiliaryExecute;
+		};
 		6DE2089829F5B80A0053E93D /* FluidGradient */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 6DE2089729F5B80A0053E93D /* XCRemoteSwiftPackageReference "FluidGradient" */;
