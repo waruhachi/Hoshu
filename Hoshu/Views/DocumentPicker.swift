@@ -54,7 +54,7 @@ struct DocumentPicker: UIViewControllerRepresentable {
             }
 
             let destFolderURL = URL(
-                fileURLWithPath: jbroot("/var/mobile/Hoshu"))
+                fileURLWithPath: "/tmp/moe.waru.hoshu")
 
             do {
                 try fileManager.createDirectory(

@@ -44,7 +44,7 @@ func rootlessPatcher(debURL: URL) -> (Int, String) {
                 of: "iphoneos-arm", with: "iphoneos-arm64"
             )
 
-        let outputPath = jbroot("/var/mobile/Hoshu/\(name).deb")
+        let outputPath = "/tmp/moe.waru.hoshu/\(name).deb"
 
         // Set file permissions to 0755
         _ = AuxiliaryExecute.spawn(
@@ -91,12 +91,12 @@ func rootlessPatcher(debURL: URL) -> (Int, String) {
 func folderCheck() {
     do {
         if FileManager.default.fileExists(
-            atPath: jbroot("/var/mobile/Hoshu"))
+            atPath: "/tmp/moe.waru.hoshu")
         {
-            NSLog("[Hoshu] We're good! :)")
+            NSLog("[Hoshu] Hoshu folder exists")
         } else {
             try FileManager.default.createDirectory(
-                atPath: jbroot("/var/mobile/Hoshu"),
+                atPath: "/tmp/moe.waru.hoshu",
                 withIntermediateDirectories: true)
         }
     } catch {

@@ -16,9 +16,8 @@ struct ContentView: View {
     @State private var showTerminalSheet = false
     @State private var terminalOutput = ""
     @State private var isProcessing = false
-    @State private var filterType: FilterType = .all
-    @State private var showDebugTerminal = false  // Added debug toggle state
-    @State private var retroTerminal = false  // Added retro terminal toggle state
+    @State private var retroTerminal = false  // Restore retro terminal toggle
+    @State private var isConverting = false  // Track converting state for button
 
     // Store the observer to be able to remove it later
     @State private var terminalOutputObserver: NSObjectProtocol? = nil
@@ -47,149 +46,132 @@ struct ContentView: View {
                 }
                 .frame(height: 50)
 
-                Button(
-                    selectedFile == nil ? "Select .deb file" : "Convert .deb"
-                ) {
+                Button(action: {
                     if selectedFile == nil {
                         UISelectionFeedbackGenerator().selectionChanged()
                         showingSheet.toggle()
                     } else {
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
-
-                        DispatchQueue.global().async {
-                            // Always assume we're converting rootful to rootless
-                            // Get filename and always replace iphoneos-arm with iphoneos-arm64
-                            let outputName = selectedFile!.deletingPathExtension()
-                                .lastPathComponent.replacingOccurrences(
-                                    of: "iphoneos-arm", with: "iphoneos-arm64"
-                                )
-
-                            let output = URL.init(
-                                fileURLWithPath: "/var/mobile/Hoshu/\(outputName).deb"
-                            )
-
-                            DispatchQueue.main.async {
-                                UIApplication.shared.isIdleTimerDisabled = true
-                                // Clear previous output and show terminal sheet
-                                self.terminalOutput = "Starting Script...\n"
-                                self.isProcessing = true
-
-                                // Only show terminal if debug mode is enabled
-                                if self.showDebugTerminal {
+                        if retroTerminal {
+                            DispatchQueue.global().async {
+                                let outputName = selectedFile!.deletingPathExtension()
+                                    .lastPathComponent.replacingOccurrences(
+                                        of: "iphoneos-arm", with: "iphoneos-arm64"
+                                    )
+                                let output = URL.init(
+                                    fileURLWithPath:
+                                        "/tmp/moe.waru.hoshu/\(outputName).deb")
+                                DispatchQueue.main.async {
+                                    UIApplication.shared.isIdleTimerDisabled = true
+                                    self.terminalOutput = "Starting Script...\n"
+                                    self.isProcessing = true
                                     self.showTerminalSheet = true
-                                } else {
-                                    // Show loading alert
-                                    let alert = UIAlertController(
-                                        title: "Converting",
-                                        message: "Please wait while the file is being converted...",
-                                        preferredStyle: .alert)
-                                    UIApplication.shared.present(alert: alert)
                                 }
-                            }
-
-                            // Use rootlessPatcher function and capture output in real-time
-                            let (exitCode, _) = rootlessPatcher(
-                                debURL: selectedFile!
-                            )
-
-                            // Update processing state when completed
-                            DispatchQueue.main.async {
-                                self.isProcessing = false
-
-                                // If we're not showing the terminal, dismiss the alert
-                                if !self.showDebugTerminal {
-                                    UIApplication.shared.dismiss()
+                                let (exitCode, _) = rootlessPatcher(
+                                    debURL: selectedFile!
+                                )
+                                DispatchQueue.main.async {
+                                    self.isProcessing = false
                                 }
-                            }
-
-                            DispatchQueue.main.async {
-                                UIApplication.shared.isIdleTimerDisabled = false
-
-                                if exitCode != 0 {
-                                    // Keep terminal open to show error if debug is on
-                                    DispatchQueue.main.async {
-                                        self.terminalOutput +=
-                                            "\n❌ Error: Script failed with exit code \(exitCode)\n"
-                                        // Clear selected file on error too
-                                        self.selectedFile = nil
-
-                                        // Show error alert if terminal is not visible
-                                        if !self.showDebugTerminal {
+                                DispatchQueue.main.async {
+                                    UIApplication.shared.isIdleTimerDisabled = false
+                                    if exitCode != 0 {
+                                        DispatchQueue.main.async {
+                                            self.terminalOutput +=
+                                                "\n❌ Error: Script failed with exit code \(exitCode)\n"
+                                            self.selectedFile = nil
                                             let errorAlert = UIAlertController(
                                                 title: "Error",
                                                 message:
                                                     "Conversion failed with exit code \(exitCode)",
                                                 preferredStyle: .alert)
-
                                             errorAlert.addAction(
                                                 UIAlertAction(title: "OK", style: .default))
                                             UIApplication.shared.present(alert: errorAlert)
                                         }
+                                        return
                                     }
-                                    return
-                                }
-
-                                // Save the output information for later use when terminal is dismissed
-                                UserDefaults.standard.set(
-                                    output.path, forKey: "lastConvertedFilePath")
-                                UserDefaults.standard.set(true, forKey: "ScriptCompleted")
-
-                                DispatchQueue.main.async {
-                                    // If we're showing debug terminal, auto-dismiss it after delay
-                                    if self.showDebugTerminal {
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                            if self.showTerminalSheet {
-                                                self.showTerminalSheet = false
-                                            }
+                                    UserDefaults.standard.set(
+                                        output.path, forKey: "lastConvertedFilePath")
+                                    UserDefaults.standard.set(true, forKey: "ScriptCompleted")
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                        if self.showTerminalSheet {
+                                            self.showTerminalSheet = false
                                         }
-                                    } else {
-                                        // If we're not showing the terminal, trigger the share options directly
-                                        self.handleScriptCompletion()
                                     }
                                 }
                             }
+                        } else {
+                            // Retro terminal is OFF: show "Converting" and then share
+                            self.isConverting = true
+                            self.terminalOutput = "Starting Script...\n"
+                            DispatchQueue.global().async {
+                                let outputName = selectedFile!.deletingPathExtension()
+                                    .lastPathComponent.replacingOccurrences(
+                                        of: "iphoneos-arm", with: "iphoneos-arm64"
+                                    )
+                                let output = URL.init(
+                                    fileURLWithPath:
+                                        "/tmp/moe.waru.hoshu/\(outputName).deb")
+                                let (exitCode, _) = rootlessPatcher(
+                                    debURL: selectedFile!
+                                )
+                                DispatchQueue.main.async {
+                                    self.isConverting = false
+                                    if exitCode != 0 {
+                                        self.terminalOutput +=
+                                            "\n❌ Error: Script failed with exit code \(exitCode)\n"
+                                        self.selectedFile = nil
+                                        let errorAlert = UIAlertController(
+                                            title: "Error",
+                                            message:
+                                                "Conversion failed with exit code \(exitCode)",
+                                            preferredStyle: .alert)
+                                        errorAlert.addAction(
+                                            UIAlertAction(title: "OK", style: .default))
+                                        UIApplication.shared.present(alert: errorAlert)
+                                        return
+                                    }
+                                    UserDefaults.standard.set(
+                                        output.path, forKey: "lastConvertedFilePath")
+                                    UserDefaults.standard.set(true, forKey: "ScriptCompleted")
+                                    // Show share options immediately
+                                    self.handleScriptCompletion()
+                                    // Reset selected file and output
+                                    self.selectedFile = nil
+                                    self.terminalOutput = ""
+                                }
+                            }
                         }
+                    }
+                }) {
+                    if selectedFile == nil {
+                        Text("Select .deb file")
+                    } else if isConverting {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            Text("Converting")
+                                .foregroundColor(.gray)
+                        }
+                    } else {
+                        Text("Convert .deb")
                     }
                 }
                 .buttonStyle(TintedButton(color: .white, fullwidth: true))
                 .padding(.horizontal, 30)
                 .padding(.top, 30)
                 .padding(.bottom, 20)
+                .disabled(isConverting)
 
-                // Container for toggles with fixed height to prevent UI shifting
-                VStack(alignment: .leading, spacing: 5) {
-                    // Debug toggle button
-                    Toggle(isOn: $showDebugTerminal) {
-                        Text("Debug")
-                            .foregroundColor(.white)
-                    }
-                    .toggleStyle(SwitchToggleStyle(tint: .gray))
-                    .padding(.horizontal, 30)
-                    .padding(.vertical, 5)
-                    .onChange(of: showDebugTerminal) { newValue in
-                        if !newValue {
-                            // Reset retro terminal when debug is toggled off
-                            retroTerminal = false
-                        }
-                    }
-
-                    // Fixed space for Retro Terminal toggle
-                    ZStack(alignment: .leading) {
-                        // Empty view to maintain spacing when toggle is hidden
-                        Color.clear
-                            .frame(height: 44)  // Approximate height of a toggle
-
-                        // Retro Terminal toggle button - only show when debug is enabled
-                        if showDebugTerminal {
-                            Toggle(isOn: $retroTerminal) {
-                                Text("Retro Terminal")
-                                    .foregroundColor(.white)
-                            }
-                            .toggleStyle(SwitchToggleStyle(tint: .gray))
-                            .padding(.horizontal, 30)
-                        }
-                    }
+                // Retro Terminal toggle
+                Toggle(isOn: $retroTerminal) {
+                    Text("Retro Terminal")
+                        .foregroundColor(.white)
                 }
+                .toggleStyle(SwitchToggleStyle(tint: .gray))
+                .padding(.horizontal, 30)
+                .padding(.vertical, 5)
                 .padding(.bottom, 30)
             }
             .padding()
@@ -244,18 +226,42 @@ struct ContentView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: {
-                        // Show filter sheet
-                        showFilterSheet.toggle()
+                        // Show clear cache alert
+                        let alert = UIAlertController(
+                            title: "Clear Cache?",
+                            message:
+                                "Are you sure you want to clear all files from the cache? This cannot be undone.",
+                            preferredStyle: .alert
+                        )
+                        alert.addAction(
+                            UIAlertAction(title: "Cancel", style: .cancel, handler: nil))
+                        alert.addAction(
+                            UIAlertAction(
+                                title: "Clear", style: .destructive,
+                                handler: { _ in
+                                    do {
+                                        let fileManager = FileManager.default
+                                        let cacheURL = URL(
+                                            fileURLWithPath: "/tmp/moe.waru.hoshu")
+                                        let fileURLs = try fileManager.contentsOfDirectory(
+                                            at: cacheURL, includingPropertiesForKeys: nil)
+                                        for fileURL in fileURLs {
+                                            try? fileManager.removeItem(at: fileURL)
+                                        }
+                                        UIImpactFeedbackGenerator(style: .soft).impactOccurred()
+                                    } catch {
+                                        UIApplication.shared.alert(
+                                            title: "Error!",
+                                            body: "Failed to clear cache.",
+                                            withButton: false)
+                                    }
+                                }))
+                        UIApplication.shared.present(alert: alert)
                     }) {
-                        Image(systemName: "folder")
+                        Image(systemName: "trash")
                             .foregroundColor(.white)
                     }
                 }
-            }
-            .sheet(isPresented: $showFilterSheet) {
-                FilterView(filterType: $filterType)
-                    .edgesIgnoringSafeArea(.all)
-                    .modifier(SheetPresentationModifier())
             }
             .sheet(isPresented: $showCreditsSheet) {
                 CreditsView()
@@ -265,7 +271,6 @@ struct ContentView: View {
             .sheet(
                 isPresented: $showTerminalSheet,
                 onDismiss: {
-                    NSLog("[Hoshu] Terminal sheet dismissed")
                     // Check if Script completed successfully
                     if UserDefaults.standard.bool(forKey: "ScriptCompleted") {
                         handleScriptCompletion()
@@ -274,7 +279,7 @@ struct ContentView: View {
             ) {
                 TerminalView(
                     outputText: $terminalOutput, isProcessing: $isProcessing,
-                    retroStyle: retroTerminal
+                    retroStyle: true  // Always retro when shown
                 )
                 .edgesIgnoringSafeArea(.all)
                 .modifier(SheetPresentationModifier())
@@ -284,7 +289,6 @@ struct ContentView: View {
 
     // Helper function to handle script completion
     private func handleScriptCompletion() {
-        NSLog("[Hoshu] Script completed flag found")
         // Reset the flag
         UserDefaults.standard.set(false, forKey: "ScriptCompleted")
 
@@ -292,7 +296,6 @@ struct ContentView: View {
         if let outputPath = UserDefaults.standard.string(
             forKey: "lastConvertedFilePath")
         {
-            NSLog("[Hoshu] Output path found: \(outputPath)")
             // Reset selected file
             selectedFile = nil
 
@@ -310,7 +313,7 @@ struct ContentView: View {
                         handler: { _ in
                             ShareFileToApp(
                                 "org.coolstar.SileoStore",
-                                jbroot(outputPath))
+                                outputPath)
                         }))
             }
 
@@ -321,7 +324,18 @@ struct ContentView: View {
                         handler: { _ in
                             ShareFileToApp(
                                 "xyz.willy.Zebra",
-                                jbroot(outputPath))
+                                outputPath)
+                        }))
+            }
+
+            if IsAppAvailable("com.roothide.patcher") {
+                alert.addAction(
+                    .init(
+                        title: "RootHide Patcher", style: .default,
+                        handler: { _ in
+                            ShareFileToApp(
+                                "com.roothide.patcher",
+                                outputPath)
                         }))
             }
 
@@ -332,7 +346,7 @@ struct ContentView: View {
                         handler: { _ in
                             ShareFileToApp(
                                 "com.tigisoftware.Filza",
-                                jbroot(outputPath))
+                                outputPath)
                         }))
             }
 
@@ -343,15 +357,11 @@ struct ContentView: View {
                         UIImpactFeedbackGenerator(
                             style: .soft
                         ).impactOccurred()
-                        checkFileManagers(
-                            path: jbroot(outputPath))
                     }))
 
-            NSLog("[Hoshu] Presenting share alert")
             // Ensure we present on the main thread after a slight delay
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 UIApplication.shared.present(alert: alert)
-                NSLog("[Hoshu] Share alert presented")
             }
         }
     }
@@ -374,10 +384,6 @@ struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
     }
-}
-
-enum FilterType {
-    case all, rootful, rootless
 }
 
 // Extensions for UIApplication to handle alerts

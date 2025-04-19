@@ -17,7 +17,7 @@ struct HoshuApp: App {
 
                     guard fileManager.fileExists(atPath: url.path) else { return }
 
-                    let destFolderURL = URL(fileURLWithPath: jbroot("/var/mobile/Hoshu"))
+                    let destFolderURL = URL(fileURLWithPath: "/tmp/moe.waru.hoshu")
 
                     do {
                         try fileManager.createDirectory(

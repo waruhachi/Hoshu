@@ -19,15 +19,6 @@ struct TerminalView: View {
     @State private var flickerOpacity = 0.0
     @State private var grainPhase = 0.0  // For animating grain
 
-    // State for character-by-character typing effect
-    @State private var displayedText = ""
-    @State private var currentCharIndex = 0
-    @State private var isTyping = false
-
-    // Typing speed configuration (seconds per character)
-    private let typingSpeed: Double = 0.07
-    private let typingVariance: Double = 0.03  // Random variance to make typing look more natural
-
     init(outputText: Binding<String>, isProcessing: Binding<Bool>, retroStyle: Bool = false) {
         self._outputText = outputText
         self._isProcessing = isProcessing
@@ -100,28 +91,6 @@ struct TerminalView: View {
         }
     }
 
-    // Function to type characters one by one
-    private func typeNextCharacter() {
-        guard currentCharIndex < outputText.count else {
-            isTyping = false
-            return
-        }
-
-        let index = outputText.index(outputText.startIndex, offsetBy: currentCharIndex)
-        displayedText += String(outputText[index])
-        currentCharIndex += 1
-
-        // If there are more characters to type, schedule the next one with a slight random delay
-        if currentCharIndex < outputText.count {
-            let randomDelay = typingSpeed + Double.random(in: -typingVariance...typingVariance)
-            DispatchQueue.main.asyncAfter(deadline: .now() + randomDelay) {
-                typeNextCharacter()
-            }
-        } else {
-            isTyping = false
-        }
-    }
-
     var body: some View {
         NavigationView {
             ZStack {
@@ -133,8 +102,8 @@ struct TerminalView: View {
                         ScrollViewReader { scrollView in
                             VStack(alignment: .leading) {
                                 Text(
-                                    displayedText
-                                        + (retroStyle && (isProcessing || isTyping)
+                                    outputText
+                                        + (retroStyle && isProcessing
                                             ? (showCursor ? "█" : "") : "")
                                 )
                                 .font(
@@ -151,7 +120,7 @@ struct TerminalView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                                 .id("outputEnd")
                                 .onReceive(timer) { _ in
-                                    if retroStyle && (isProcessing || isTyping) {
+                                    if retroStyle && isProcessing {
                                         showCursor.toggle()
                                     }
                                 }
@@ -161,18 +130,7 @@ struct TerminalView: View {
                                 NotificationCenter.default.publisher(
                                     for: Notification.Name("terminalOutputUpdate"))
                             ) { notification in
-                                if let newText = notification.object as? String {
-                                    // Only update for new content
-                                    if newText != outputText {
-                                        let oldTextCount = outputText.count
-                                        outputText = newText
-
-                                        // Only animate the new part
-                                        currentCharIndex = oldTextCount
-                                        isTyping = true
-                                        typeNextCharacter()
-                                    }
-
+                                if notification.object as? String != nil {
                                     withAnimation {
                                         scrollView.scrollTo("outputEnd", anchor: .bottom)
                                     }
@@ -188,22 +146,6 @@ struct TerminalView: View {
                     }
                 }
                 .padding(.vertical)
-                .onAppear {
-                    restartTypingAnimation()
-                }
-                .onChange(of: outputText) { newValue in
-                    if newValue != displayedText && !isTyping {
-                        // Only animate the new part
-                        if displayedText.isEmpty {
-                            restartTypingAnimation()
-                        } else {
-                            let commonPrefix = newValue.commonPrefix(with: displayedText)
-                            currentCharIndex = commonPrefix.count
-                            isTyping = true
-                            typeNextCharacter()
-                        }
-                    }
-                }
 
                 // Apply CRT curve effect when in retro mode
                 if retroStyle {
@@ -251,24 +193,16 @@ struct TerminalView: View {
             .navigationBarTitle("Script Output", displayMode: .inline)
             .navigationBarItems(
                 trailing: Button(action: {
-                    if !isProcessing && !isTyping {
+                    if !isProcessing {
                         presentationMode.wrappedValue.dismiss()
                     }
                 }) {
                     Text("Done")
-                        .foregroundColor((isProcessing || isTyping) ? .gray : .white)
+                        .foregroundColor(isProcessing ? .gray : .white)
                 }
-                .disabled(isProcessing || isTyping)
+                .disabled(isProcessing)
             )
         }
-    }
-
-    // Function to restart the typing animation
-    private func restartTypingAnimation() {
-        isTyping = true
-        displayedText = ""
-        currentCharIndex = 0
-        typeNextCharacter()
     }
 
     // CRT screen curve effect

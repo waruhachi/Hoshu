@@ -1,5 +1,4 @@
 #!/bin/sh
 
 #downgrade from root to mobile
-chown -R mobile:mobile /var/mobile/Hoshu/ >/dev/null 2>&1 || true
-chown -R mobile:mobile /var/tmp/moe.waru.hoshu-Inbox/ >/dev/null 2>&1 || true
+chown -R mobile:mobile /tmp/moe.waru.hoshu/ >/dev/null 2>&1 || true

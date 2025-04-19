@@ -14,9 +14,3 @@ $(XCODEPROJ_NAME)_CODESIGN_FLAGS = -Sentitlements.plist
 $(XCODEPROJ_NAME)_INSTALL_PATH = /Applications
 
 include $(THEOS_MAKE_PATH)/xcodeproj.mk
-
-clean::
-	rm -rf ./packages/*
-
-after-install::
-	install.exec 'uiopen -b moe.waru.hoshu'

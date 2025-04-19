@@ -19,11 +19,11 @@
 	<key>com.apple.security.exception.files.absolute-path.read-write</key>
 	<array>
 		<string>/</string>
+		<string>/private/var/</string>
 		<string>/private/preboot/</string>
+		<string>/private/var/mobile/Documents</string>
 		<string>/var/</string>
 		<string>/var/mobile/Documents</string>
-		<string>/private/var/</string>
-		<string>/private/var/mobile/Documents</string>
 	</array>
 	<key>com.apple.private.security.sandbox</key>
 	<false/>
@@ -35,7 +35,7 @@
 	<true/>
 	<key>com.apple.private.security.container-required</key>
 	<false/>
-	    <!-- Prevent weird sharesheet CoreImage crash -->
+	<!-- Prevent weird sharesheet CoreImage crash -->
     <key>com.apple.security.iokit-user-client-class</key>
     <array>
         <string>AGXDeviceUserClient</string>
