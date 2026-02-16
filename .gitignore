@@ -2,6 +2,10 @@
 .vscode
 .DS_Store
 
+*.xcuserstate
+project.xcworkspace/
+xcuserdata/
+
 buildServer.json
 
 /packages
