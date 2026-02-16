@@ -141,236 +141,14 @@ struct AlternativeFilePicker: View {
     }
 
     var body: some View {
-        NavigationView {
-            ZStack {
-                Color.black.edgesIgnoringSafeArea(.all)
-
-                VStack {
-                    // Search field (now positioned first)
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.gray)
-
-                        TextField(
-                            "Search files or enter a path",
-                            text: $searchText
-                        )
-                        .foregroundColor(.white)
-                        .accentColor(.white)
-                        .disableAutocorrection(true)
-                        .autocapitalization(.none)
-                        .onChange(of: searchText) { _ in
-                            checkForDirectoryPath()
-                        }
-                        // Make placeholder text brighter
-                        .placeholder(when: searchText.isEmpty) {
-                            Text("Search files or enter a path")
-                                .foregroundColor(.white.opacity(0.7))
-                        }
-
-                        if !searchText.isEmpty {
-                            Button(action: {
-                                searchText = ""
-                                detectedDirectoryPath = nil
-                            }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.gray)
-                                    .padding(2)
-                            }
-                        }
-                    }
-                    .padding(8)
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(10)
-                    .padding(.horizontal)
-                    .padding(.top, 10)
-
-                    // Path jump button when a valid path is typed
-                    if let directoryPath = detectedDirectoryPath {
-                        Button(action: {
-                            navigateToDirectory(directoryPath)
-                        }) {
-                            HStack {
-                                Image(systemName: "arrow.right.circle.fill")
-                                    .foregroundColor(.cyan)
-                                Text("Go to \(directoryPath)")
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                            }
-                            .padding(8)
-                            .background(Color.gray.opacity(0.3))
-                            .cornerRadius(8)
-                            .padding(.horizontal)
-                        }
-                        .padding(.top, 5)
-                    }
-
-                    // Breadcrumbs now below search bar with matching horizontal padding
-                    HStack {
-                        // Display path components as separate tappable items
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 5) {
-                                let pathComponents = currentPath.split(
-                                    separator: "/"
-                                )
-
-                                // Root directory
-                                Text("/")
-                                    .foregroundColor(.white)
-                                    .font(.system(size: 16))
-                                    .onTapGesture {
-                                        navigateToDirectory("/")
-                                    }
-
-                                // Other path components
-                                ForEach(0..<pathComponents.count, id: \.self) {
-                                    index in
-                                    let component = pathComponents[index]
-                                    if !component.isEmpty {
-                                        ZStack(alignment: .bottom) {
-                                            Text("\(component)")
-                                                .foregroundColor(.white)
-                                                .font(.system(size: 16))
-                                                .lineLimit(1)
-                                                .onTapGesture {
-                                                    // Calculate the path up to this component
-                                                    let pathToHere =
-                                                        "/"
-                                                        + pathComponents[
-                                                            0...index
-                                                        ].joined(
-                                                            separator: "/"
-                                                        )
-                                                    navigateToDirectory(
-                                                        pathToHere
-                                                    )
-                                                }
-
-                                            // Custom underline compatible with iOS 15 and 16
-                                            Rectangle()
-                                                .frame(height: 2.0)
-                                                .foregroundColor(.white)
-                                                .offset(y: 1)
-                                        }
-
-                                        if index < pathComponents.count - 1 {
-                                            Text("/")
-                                                .foregroundColor(.white)
-                                                .font(.system(size: 12))
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 5)
-                    .padding(.bottom, 5)
-
-                    ZStack {
-                        // This provides a solid black background behind the List
-                        Color.black.ignoresSafeArea()
-
-                        ScrollView {
-                            LazyVStack(spacing: 0) {
-                                ForEach(filteredContents) { item in
-                                    HStack {
-                                        Image(systemName: item.iconName)
-                                            .foregroundColor(item.color)
-                                            .frame(width: 25)
-
-                                        VStack(alignment: .leading) {
-                                            Text(item.name)
-                                                .foregroundColor(
-                                                    item.name.hasSuffix(".deb")
-                                                        || item.isDirectory
-                                                        ? .white : .gray
-                                                )
-
-                                            HStack {
-                                                Text(item.formattedDate)
-                                                    .font(.system(size: 12))
-                                                    .foregroundColor(.gray)
-
-                                                if !item.isDirectory {
-                                                    Text(item.formattedSize)
-                                                        .font(.system(size: 12))
-                                                        .foregroundColor(.gray)
-                                                }
-                                            }
-                                        }
-
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 16)
-                                    .background(Color.black)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        if item.isDirectory {
-                                            navigateToDirectory(item.path)
-                                        } else if item.name.hasSuffix(".deb") {
-                                            // Auto-select file and dismiss picker
-                                            onFileSelected(
-                                                URL(fileURLWithPath: item.path)
-                                            )
-                                            isPresented = false
-                                        }
-                                    }
-                                }
-                            }
-                            .background(Color.black)
-                        }
-                        .background(Color.black)
-                    }
-                    .background(Color.black)
+        Group {
+            if #available(iOS 16.0, *) {
+                NavigationStack {
+                    pickerContent
                 }
-                .background(Color.black)
-            }
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        isPresented = false
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.white)
-                            .padding()
-                    }
-                }
-
-                // Home button
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        navigateToDirectory("/")
-                    }) {
-                        Image(systemName: "house.fill")
-                            .foregroundColor(.white)
-                    }
-                }
-
-                // Sort button
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(action: {
-                        showingSortOptions.toggle()
-                    }) {
-                        Image(systemName: SortOption.sortIcon)
-                            .foregroundColor(.white)
-                    }
-                }
-
-                // Back button, only shown when not at root
-                ToolbarItem(placement: .navigationBarLeading) {
-                    if currentPath != "/" {
-                        Button(action: {
-                            navigateUp()
-                        }) {
-                            Image(systemName: "arrowshape.turn.up.backward")
-                                .foregroundColor(.white)
-                        }
-                    }
+            } else {
+                NavigationView {
+                    pickerContent
                 }
             }
         }
@@ -395,6 +173,240 @@ struct AlternativeFilePicker: View {
                     appState.lastFilePickerSortOption = option.toIndex
                     // Reload the directory contents with new sort option
                     loadDirectoryContents()
+                }
+            }
+        }
+    }
+
+    private var pickerContent: some View {
+        ZStack {
+            Color.black.edgesIgnoringSafeArea(.all)
+
+            VStack {
+                // Search field (now positioned first)
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.gray)
+
+                    TextField(
+                        "Search files or enter a path",
+                        text: $searchText
+                    )
+                    .foregroundStyle(.white)
+                    .tint(.white)
+                    .disableAutocorrection(true)
+                    .autocapitalization(.none)
+                    .onChange(of: searchText) { _ in
+                        checkForDirectoryPath()
+                    }
+                    // Make placeholder text brighter
+                    .placeholder(when: searchText.isEmpty) {
+                        Text("Search files or enter a path")
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+
+                    if !searchText.isEmpty {
+                        Button(action: {
+                            searchText = ""
+                            detectedDirectoryPath = nil
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.gray)
+                                .padding(2)
+                        }
+                    }
+                }
+                .padding(8)
+                .background(Color.gray.opacity(0.2))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .padding(.horizontal)
+                .padding(.top, 10)
+
+                // Path jump button when a valid path is typed
+                if let directoryPath = detectedDirectoryPath {
+                    Button(action: {
+                        navigateToDirectory(directoryPath)
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .foregroundStyle(.cyan)
+                            Text("Go to \(directoryPath)")
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                        }
+                        .padding(8)
+                        .background(Color.gray.opacity(0.3))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .padding(.horizontal)
+                    }
+                    .padding(.top, 5)
+                }
+
+                // Breadcrumbs now below search bar with matching horizontal padding
+                HStack {
+                    // Display path components as separate tappable items
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 5) {
+                            let pathComponents = currentPath.split(
+                                separator: "/"
+                            )
+
+                            // Root directory
+                            Text("/")
+                                .foregroundStyle(.white)
+                                .font(.system(size: 16))
+                                .onTapGesture {
+                                    navigateToDirectory("/")
+                                }
+
+                            // Other path components
+                            ForEach(0..<pathComponents.count, id: \.self) {
+                                index in
+                                let component = pathComponents[index]
+                                if !component.isEmpty {
+                                    ZStack(alignment: .bottom) {
+                                        Text("\(component)")
+                                            .foregroundStyle(.white)
+                                            .font(.system(size: 16))
+                                            .lineLimit(1)
+                                            .onTapGesture {
+                                                // Calculate the path up to this component
+                                                let pathToHere =
+                                                    "/"
+                                                    + pathComponents[
+                                                        0...index
+                                                    ].joined(
+                                                        separator: "/"
+                                                    )
+                                                navigateToDirectory(
+                                                    pathToHere
+                                                )
+                                            }
+
+                                        // Custom underline compatible with iOS 15 and 16
+                                        Rectangle()
+                                            .frame(height: 2.0)
+                                            .foregroundStyle(.white)
+                                            .offset(y: 1)
+                                    }
+
+                                    if index < pathComponents.count - 1 {
+                                        Text("/")
+                                            .foregroundStyle(.white)
+                                            .font(.system(size: 12))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 5)
+                .padding(.bottom, 5)
+
+                ZStack {
+                    // This provides a solid black background behind the List
+                    Color.black.ignoresSafeArea()
+
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(filteredContents) { item in
+                                HStack {
+                                    Image(systemName: item.iconName)
+                                        .foregroundStyle(item.color)
+                                        .frame(width: 25)
+
+                                    VStack(alignment: .leading) {
+                                        Text(item.name)
+                                            .foregroundStyle(
+                                                item.name.hasSuffix(".deb")
+                                                    || item.isDirectory
+                                                    ? .white : .gray
+                                            )
+
+                                        HStack {
+                                            Text(item.formattedDate)
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(.gray)
+
+                                            if !item.isDirectory {
+                                                Text(item.formattedSize)
+                                                    .font(.system(size: 12))
+                                                    .foregroundStyle(.gray)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer()
+                                }
+                                .padding(.vertical, 8)
+                                .padding(.horizontal, 16)
+                                .background(Color.black)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    if item.isDirectory {
+                                        navigateToDirectory(item.path)
+                                    } else if item.name.hasSuffix(".deb") {
+                                        // Auto-select file and dismiss picker
+                                        onFileSelected(
+                                            URL(fileURLWithPath: item.path)
+                                        )
+                                        isPresented = false
+                                    }
+                                }
+                            }
+                        }
+                        .background(Color.black)
+                    }
+                    .background(Color.black)
+                }
+                .background(Color.black)
+            }
+            .background(Color.black)
+        }
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    isPresented = false
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.white)
+                        .padding()
+                }
+            }
+
+            // Home button
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    navigateToDirectory("/")
+                }) {
+                    Image(systemName: "house.fill")
+                        .foregroundStyle(.white)
+                }
+            }
+
+            // Sort button
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(action: {
+                    showingSortOptions.toggle()
+                }) {
+                    Image(systemName: SortOption.sortIcon)
+                        .foregroundStyle(.white)
+                }
+            }
+
+            // Back button, only shown when not at root
+            ToolbarItem(placement: .navigationBarLeading) {
+                if currentPath != "/" {
+                    Button(action: {
+                        navigateUp()
+                    }) {
+                        Image(systemName: "arrowshape.turn.up.backward")
+                            .foregroundStyle(.white)
+                    }
                 }
             }
         }
@@ -1037,7 +1049,7 @@ struct ContentView: View {
                                 isSettingsPresented = true
                             }) {
                                 Image(systemName: "gear")
-                                    .foregroundColor(.white)
+                                    .foregroundStyle(.white)
                                     .font(.system(size: 24))
                                     .padding()
                             }
@@ -1062,10 +1074,10 @@ struct ContentView: View {
                                             .lastPathComponent
                                             .cleanIOSFileSuffix()
                                     )
-                                    .foregroundColor(.white)
+                                    .foregroundStyle(.white)
 
                                     Image(systemName: "info.circle")
-                                        .foregroundColor(.gray)
+                                        .foregroundStyle(.gray)
                                         .font(.system(size: 14))
 
                                     // Right spacer with equal weight
@@ -1106,12 +1118,12 @@ struct ContentView: View {
                                         )
                                         .scaleEffect(0.8)
                                     Text("Converting...")
-                                        .foregroundColor(.white)
+                                        .foregroundStyle(.white)
                                 }
                                 .padding()
                                 .frame(maxWidth: .infinity)
                                 .background(.ultraThinMaterial)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             } else if appState.isParsingDeb {
                                 HStack {
                                     ProgressView()
@@ -1122,30 +1134,32 @@ struct ContentView: View {
                                         )
                                         .scaleEffect(0.8)
                                     Text("Parsing...")
-                                        .foregroundColor(.white)
+                                        .foregroundStyle(.white)
                                 }
                                 .padding()
                                 .frame(maxWidth: .infinity)
                                 .background(.ultraThinMaterial)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             } else if conversionCompleted {
                                 Text("Conversion Complete!")
-                                    .foregroundColor(.white)
+                                    .foregroundStyle(.white)
                                     .padding()
                                     .frame(maxWidth: .infinity)
                                     .background(.ultraThinMaterial)
-                                    .cornerRadius(8)
+                                    .clipShape(
+                                        RoundedRectangle(cornerRadius: 8)
+                                    )
                             } else {
                                 Text(
                                     selectedFilePath == nil
                                         ? "Select .deb File"
                                         : "Convert .deb File"
                                 )
-                                .foregroundColor(.white)
+                                .foregroundStyle(.white)
                                 .padding()
                                 .frame(maxWidth: .infinity)
                                 .background(.ultraThinMaterial)
-                                .cornerRadius(8)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
                             }
                         }
                         .fileImporter(
@@ -1292,11 +1306,13 @@ struct ContentView: View {
                                         return "Import from URL"
                                     }()
                                     Text(label)
-                                        .foregroundColor(.white)
+                                        .foregroundStyle(.white)
                                         .padding()
                                         .frame(maxWidth: .infinity)
                                         .background(.ultraThinMaterial)
-                                        .cornerRadius(8)
+                                        .clipShape(
+                                            RoundedRectangle(cornerRadius: 8)
+                                        )
                                 }
                                 .disabled(isPreflighting)
 
@@ -1305,11 +1321,15 @@ struct ContentView: View {
                                         cancelDownload()
                                     } label: {
                                         Text("Cancel Download")
-                                            .foregroundColor(.red)
+                                            .foregroundStyle(.red)
                                             .padding(8)
                                             .frame(maxWidth: .infinity)
                                             .background(Color.red.opacity(0.15))
-                                            .cornerRadius(8)
+                                            .clipShape(
+                                                RoundedRectangle(
+                                                    cornerRadius: 8
+                                                )
+                                            )
                                     }
                                 }
                             }
