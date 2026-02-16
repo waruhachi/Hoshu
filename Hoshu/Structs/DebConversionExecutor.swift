@@ -12,7 +12,21 @@ final class DebConversionExecutor {
     private var onConvertedFileFound: ((String) -> Void)?
     private let convertedDirectory = "/tmp/moe.waru.hoshu/.converted/"
     private var conversionSucceeded = false
+    private var conversionOperationID: UUID?
     var conversionSucceededValue: Bool { conversionSucceeded }
+
+    private func shortOperationID(_ id: UUID?) -> String? {
+        guard let id else { return nil }
+        return String(id.uuidString.prefix(8))
+    }
+
+    private func logLifecycle(_ message: String, operationID: UUID? = nil) {
+        if let shortID = shortOperationID(operationID) {
+            NSLog("[Hoshu][Convert][\(shortID)] \(message)")
+        } else {
+            NSLog("[Hoshu][Convert] \(message)")
+        }
+    }
 
     init(
         outputHandler: @escaping (String) -> Void = { _ in },
@@ -25,9 +39,21 @@ final class DebConversionExecutor {
     }
 
     func start(withFilePath filePath: String) {
+        let operationID = UUID()
+
         if isRunning {
+            logLifecycle(
+                "Ignored start request because conversion is already running",
+                operationID: conversionOperationID
+            )
             return
         }
+
+        conversionOperationID = operationID
+        logLifecycle(
+            "Starting conversion for \(filePath)",
+            operationID: operationID
+        )
 
         isRunning = true
         didComplete = false
@@ -49,7 +75,15 @@ final class DebConversionExecutor {
             } ?? []
 
         executionTask = Task.detached(priority: .userInitiated) {
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                await MainActor.run {
+                    self.logLifecycle(
+                        "Execution task cancelled before spawn",
+                        operationID: operationID
+                    )
+                }
+                return
+            }
 
             AuxiliaryExecute.spawn(
                 command: "/var/jb/usr/local/bin/rootless-patcher",
@@ -86,6 +120,10 @@ final class DebConversionExecutor {
 
                     self.isRunning = false
                     self.executionTask = nil
+                    self.logLifecycle(
+                        "Conversion process completed. success=\(self.conversionSucceeded)",
+                        operationID: operationID
+                    )
                     self.finish(success: self.conversionSucceeded)
                 }
             }
@@ -94,6 +132,11 @@ final class DebConversionExecutor {
 
     private func captureConvertedPath(from output: String) {
         guard output.contains("Done! New .deb path: ") else { return }
+
+        logLifecycle(
+            "Detected converted package path in process output",
+            operationID: conversionOperationID
+        )
 
         let lines = output.components(separatedBy: .newlines)
         for line in lines {
@@ -130,17 +173,29 @@ final class DebConversionExecutor {
                 convertedFilePath = newPath
                 onConvertedFileFound?(newPath)
                 conversionSucceeded = true
+                logLifecycle(
+                    "Moved converted package to managed path: \(newPath)",
+                    operationID: conversionOperationID
+                )
             } catch {
                 convertedFilePath = convertedPath
                 if let convertedFilePath {
                     onConvertedFileFound?(convertedFilePath)
                     conversionSucceeded = true
+                    logLifecycle(
+                        "Using converted package at original path: \(convertedFilePath)",
+                        operationID: conversionOperationID
+                    )
                 }
             }
         }
     }
 
     func stop() {
+        logLifecycle(
+            "Stopping conversion and cancelling execution task",
+            operationID: conversionOperationID
+        )
         executionTask?.cancel()
         executionTask = nil
         isRunning = false
@@ -150,6 +205,11 @@ final class DebConversionExecutor {
     private func finish(success: Bool) {
         if didComplete { return }
         didComplete = true
+        logLifecycle(
+            "Finishing conversion callback. success=\(success)",
+            operationID: conversionOperationID
+        )
+        conversionOperationID = nil
         completionHandler(success)
     }
 }

@@ -609,6 +609,8 @@ struct ContentView: View {
     @State private var retryAttempt: Int = 0
     @State private var retryTask: Task<Void, Never>? = nil
     @State private var extractionTask: Task<Void, Never>? = nil
+    @State private var extractionOperationID: UUID? = nil
+    @State private var downloadOperationID: UUID? = nil
     private let maxDownloadRetries: Int = 3
     @State private var cancelRequested: Bool = false
 
@@ -776,8 +778,17 @@ struct ContentView: View {
 
     // This function resets both app state and local view state
     private func resetAllState() {
+        if extractionTask != nil {
+            logLifecycle(
+                "Extract",
+                "Cancelling active extraction task during reset",
+                operationID: extractionOperationID
+            )
+        }
         extractionTask?.cancel()
         extractionTask = nil
+        extractionOperationID = nil
+        downloadOperationID = nil
 
         // Reset AppState
         appState.resetState()
@@ -805,8 +816,41 @@ struct ContentView: View {
         }
     }
 
+    private func shortOperationID(_ id: UUID?) -> String? {
+        guard let id else { return nil }
+        return String(id.uuidString.prefix(8))
+    }
+
+    private func clearExtractionOperationIDIfMatches(_ id: UUID) {
+        runOnMain {
+            if self.extractionOperationID == id {
+                self.extractionOperationID = nil
+            }
+        }
+    }
+
+    private func clearDownloadOperationIDIfMatches(_ id: UUID) {
+        if downloadOperationID == id {
+            downloadOperationID = nil
+        }
+    }
+
+    private func logLifecycle(
+        _ area: String,
+        _ message: String,
+        operationID: UUID? = nil
+    ) {
+        if let shortID = shortOperationID(operationID) {
+            NSLog("[Hoshu][\(area)][\(shortID)] \(message)")
+        } else {
+            NSLog("[Hoshu][\(area)] \(message)")
+        }
+    }
+
     // Extract .deb file to staging directory using AuxiliaryExecute to run dpkg-deb commands
     private func extractDebFile(filePath: String) {
+        let operationID = UUID()
+
         guard FileManager.default.fileExists(atPath: filePath) else {
             NSLog("[Hoshu] File does not exist at path: \(filePath)")
             runOnMain {
@@ -815,17 +859,39 @@ struct ContentView: View {
             return
         }
 
+        extractionOperationID = operationID
+        logLifecycle(
+            "Extract",
+            "Starting extraction for \(filePath)",
+            operationID: operationID
+        )
+
         // Set parsing state to true
         runOnMain {
             self.appState.isParsingDeb = true
         }
 
+        if extractionTask != nil {
+            logLifecycle(
+                "Extract",
+                "Cancelling previous extraction task before new extraction",
+                operationID: extractionOperationID
+            )
+        }
         extractionTask?.cancel()
         extractionTask = nil
 
         // Perform extraction in background to prevent UI freezing
         extractionTask = Task.detached(priority: .userInitiated) { [self] in
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                logLifecycle(
+                    "Extract",
+                    "Extraction task cancelled before work started",
+                    operationID: operationID
+                )
+                clearExtractionOperationIDIfMatches(operationID)
+                return
+            }
 
             // Get filename without extension
             let fileURL = URL(fileURLWithPath: filePath)
@@ -847,7 +913,15 @@ struct ContentView: View {
                     withIntermediateDirectories: true
                 )
 
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    logLifecycle(
+                        "Extract",
+                        "Extraction cancelled before dpkg invocation",
+                        operationID: operationID
+                    )
+                    clearExtractionOperationIDIfMatches(operationID)
+                    return
+                }
 
                 let environmentPath: [String] =
                     ProcessInfo
@@ -883,7 +957,15 @@ struct ContentView: View {
                     "[Hoshu] Successfully extracted \(filename) to \(extractionDir)"
                 )
 
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    logLifecycle(
+                        "Extract",
+                        "Extraction cancelled before control parsing",
+                        operationID: operationID
+                    )
+                    clearExtractionOperationIDIfMatches(operationID)
+                    return
+                }
 
                 // Parse the control file - still in background thread
                 self.parseControlFile(extractionDir: extractionDir)
@@ -892,25 +974,66 @@ struct ContentView: View {
                 NSLog(
                     "[Hoshu] Error extracting .deb: \(error.localizedDescription)"
                 )
-                if Task.isCancelled { return }
+                if Task.isCancelled {
+                    logLifecycle(
+                        "Extract",
+                        "Extraction cancelled while handling extraction error",
+                        operationID: operationID
+                    )
+                    clearExtractionOperationIDIfMatches(operationID)
+                    return
+                }
+                logLifecycle(
+                    "Extract",
+                    "Extraction failed for \(filePath): \(error.localizedDescription)",
+                    operationID: operationID
+                )
+                clearExtractionOperationIDIfMatches(operationID)
                 runOnMain {
                     self.appState.isParsingDeb = false
                 }
                 return
             }
 
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                logLifecycle(
+                    "Extract",
+                    "Extraction cancelled before completion state update",
+                    operationID: operationID
+                )
+                clearExtractionOperationIDIfMatches(operationID)
+                return
+            }
 
             // Set parsing state back to false when complete
             runOnMain {
                 self.appState.isParsingDeb = false
             }
+            logLifecycle(
+                "Extract",
+                "Extraction completed for \(filePath)",
+                operationID: operationID
+            )
+            clearExtractionOperationIDIfMatches(operationID)
         }
     }
 
     // Parse the control file from the extracted .deb
     private func parseControlFile(extractionDir: String) {
-        if Task.isCancelled { return }
+        if Task.isCancelled {
+            logLifecycle(
+                "Control",
+                "Control parsing cancelled for \(extractionDir)",
+                operationID: extractionOperationID
+            )
+            return
+        }
+
+        logLifecycle(
+            "Control",
+            "Parsing control file in \(extractionDir)",
+            operationID: extractionOperationID
+        )
 
         let controlFilePath = extractionDir + "/DEBIAN/control"
         let fileManager = FileManager.default
@@ -1632,6 +1755,13 @@ extension ContentView {
         guard isPotentiallyValidURL(raw), let url = URL(string: raw) else {
             return
         }
+        let operationID = UUID()
+        downloadOperationID = operationID
+        logLifecycle(
+            "Download",
+            "Starting preflight for \(url.absoluteString)",
+            operationID: operationID
+        )
         showURLImportPrompt = false
         isPreflighting = true
         downloadProgress = 0
@@ -1657,10 +1787,16 @@ extension ContentView {
             if error != nil {
                 Task { @MainActor in
                     if !cancelRequested {
+                        logLifecycle(
+                            "Download",
+                            "HEAD preflight failed; falling back to direct download",
+                            operationID: operationID
+                        )
                         isPreflighting = false
                         startDownloadWithRetry(
                             url: url,
-                            resolvedFilename: url.lastPathComponent
+                            resolvedFilename: url.lastPathComponent,
+                            operationID: operationID
                         )
                     }
                 }
@@ -1669,10 +1805,16 @@ extension ContentView {
             guard let http = response as? HTTPURLResponse else {
                 Task { @MainActor in
                     if !cancelRequested {
+                        logLifecycle(
+                            "Download",
+                            "HEAD preflight returned non-HTTP response; falling back",
+                            operationID: operationID
+                        )
                         isPreflighting = false
                         startDownloadWithRetry(
                             url: url,
-                            resolvedFilename: url.lastPathComponent
+                            resolvedFilename: url.lastPathComponent,
+                            operationID: operationID
                         )
                     }
                 }
@@ -1681,10 +1823,16 @@ extension ContentView {
             if http.statusCode == 405 {
                 Task { @MainActor in
                     if !cancelRequested {
+                        logLifecycle(
+                            "Download",
+                            "HEAD not allowed (405); falling back to direct download",
+                            operationID: operationID
+                        )
                         isPreflighting = false
                         startDownloadWithRetry(
                             url: url,
-                            resolvedFilename: url.lastPathComponent
+                            resolvedFilename: url.lastPathComponent,
+                            operationID: operationID
                         )
                     }
                 }
@@ -1693,8 +1841,16 @@ extension ContentView {
             guard (200..<400).contains(http.statusCode) else {
                 Task { @MainActor in
                     if !cancelRequested {
+                        logLifecycle(
+                            "Download",
+                            "HEAD preflight rejected with status \(http.statusCode)",
+                            operationID: operationID
+                        )
                         isPreflighting = false
-                        handleDownloadError("HEAD status \(http.statusCode)")
+                        handleDownloadError(
+                            "HEAD status \(http.statusCode)",
+                            operationID: operationID
+                        )
                     }
                 }
                 return
@@ -1708,10 +1864,16 @@ extension ContentView {
             )
             Task { @MainActor in
                 if !cancelRequested {
+                    logLifecycle(
+                        "Download",
+                        "Preflight succeeded; resolved filename \(resolvedName)",
+                        operationID: operationID
+                    )
                     isPreflighting = false
                     startDownloadWithRetry(
                         url: url,
-                        resolvedFilename: resolvedName
+                        resolvedFilename: resolvedName,
+                        operationID: operationID
                     )
                 }
             }
@@ -1720,14 +1882,26 @@ extension ContentView {
     }
 
     @MainActor
-    private func startDownloadWithRetry(url: URL, resolvedFilename: String) {
+    private func startDownloadWithRetry(
+        url: URL,
+        resolvedFilename: String,
+        operationID: UUID? = nil
+    ) {
+        let effectiveOperationID = operationID ?? UUID()
+        downloadOperationID = effectiveOperationID
+        logLifecycle(
+            "Download",
+            "Starting retry workflow for \(resolvedFilename)",
+            operationID: effectiveOperationID
+        )
         retryAttempt = 0
         retryTask?.cancel()
         retryTask = nil
         attemptDownload(
             url: url,
             resolvedFilename: resolvedFilename,
-            attempt: 1
+            attempt: 1,
+            operationID: effectiveOperationID
         )
     }
 
@@ -1735,20 +1909,36 @@ extension ContentView {
     private func attemptDownload(
         url: URL,
         resolvedFilename: String,
-        attempt: Int
+        attempt: Int,
+        operationID: UUID
     ) {
         if cancelRequested { return }
+        logLifecycle(
+            "Download",
+            "Attempt \(attempt) for \(resolvedFilename)",
+            operationID: operationID
+        )
         retryAttempt = attempt - 1
         beginDownload(
             url: url,
             resolvedFilename: resolvedFilename,
-            attempt: attempt
+            attempt: attempt,
+            operationID: operationID
         )
     }
 
     @MainActor
-    private func beginDownload(url: URL, resolvedFilename: String, attempt: Int)
-    {
+    private func beginDownload(
+        url: URL,
+        resolvedFilename: String,
+        attempt: Int,
+        operationID: UUID
+    ) {
+        logLifecycle(
+            "Download",
+            "Begin transfer attempt \(attempt) for \(resolvedFilename)",
+            operationID: operationID
+        )
         isDownloading = true
         appState.isParsingDeb = true
         let downloader = DebURLDownloader(
@@ -1784,6 +1974,11 @@ extension ContentView {
                             && attempt < maxDownloadRetries
                         {
                             let delay = pow(2.0, Double(attempt - 1))
+                            logLifecycle(
+                                "Download",
+                                "Transient error on attempt \(attempt): \(error.localizedDescription). Retrying in \(Int(delay))s",
+                                operationID: operationID
+                            )
                             retryTask?.cancel()
                             retryTask = Task {
                                 let delayNanoseconds = UInt64(
@@ -1796,23 +1991,35 @@ extension ContentView {
                                 attemptDownload(
                                     url: url,
                                     resolvedFilename: resolvedFilename,
-                                    attempt: attempt + 1
+                                    attempt: attempt + 1,
+                                    operationID: operationID
                                 )
                             }
                         } else {
-                            handleDownloadError(error.localizedDescription)
+                            logLifecycle(
+                                "Download",
+                                "Download failed on attempt \(attempt): \(error.localizedDescription)",
+                                operationID: operationID
+                            )
+                            handleDownloadError(
+                                error.localizedDescription,
+                                operationID: operationID
+                            )
                         }
                     }
                     return
                 }
                 guard let tempURL else {
-                    Task { @MainActor in handleDownloadError("No data") }
+                    Task { @MainActor in
+                        handleDownloadError("No data", operationID: operationID)
+                    }
                     return
                 }
                 Task { @MainActor in
                     finalizeDownload(
                         tempURL: tempURL,
-                        filename: resolvedFilename
+                        filename: resolvedFilename,
+                        operationID: operationID
                     )
                 }
             }
@@ -1822,7 +2029,11 @@ extension ContentView {
     }
 
     @MainActor
-    private func finalizeDownload(tempURL: URL, filename: String) {
+    private func finalizeDownload(
+        tempURL: URL,
+        filename: String,
+        operationID: UUID
+    ) {
         let fileManager = FileManager.default
         let cleanedName = filename.cleanIOSFileSuffix()
         let destinationPath = importingDirectory + cleanedName
@@ -1840,18 +2051,41 @@ extension ContentView {
             retryTask?.cancel()
             retryTask = nil
             appState.isParsingDeb = true  // keep parsing flag until extraction done
+            logLifecycle(
+                "Download",
+                "Download finalized at \(destinationPath); starting extraction",
+                operationID: operationID
+            )
+            clearDownloadOperationIDIfMatches(operationID)
             extractDebFile(filePath: destinationPath)
         } catch {
-            handleDownloadError(error.localizedDescription)
+            handleDownloadError(
+                error.localizedDescription,
+                operationID: operationID
+            )
         }
     }
 
     @MainActor
-    private func handleDownloadError(_ message: String) {
+    private func handleDownloadError(
+        _ message: String,
+        operationID: UUID? = nil
+    ) {
+        let effectiveOperationID = operationID ?? downloadOperationID
+        logLifecycle(
+            "Download",
+            "Download workflow failed: \(message)",
+            operationID: effectiveOperationID
+        )
         downloadErrorAlert = DownloadErrorAlert(message: message)
         retryTask?.cancel()
         retryTask = nil
         activeDownloader = nil
+        if let effectiveOperationID {
+            clearDownloadOperationIDIfMatches(effectiveOperationID)
+        } else {
+            downloadOperationID = nil
+        }
         isDownloading = false
         isPreflighting = false
         appState.isParsingDeb = false
@@ -1954,11 +2188,17 @@ extension DebURLDownloader {
 extension ContentView {
     @MainActor
     private func cancelDownload() {
+        logLifecycle(
+            "Download",
+            "Cancellation requested",
+            operationID: downloadOperationID
+        )
         cancelRequested = true
         retryTask?.cancel()
         retryTask = nil
         activeDownloader?.cancel()
         activeDownloader = nil
+        downloadOperationID = nil
         isDownloading = false
         isPreflighting = false
         appState.isParsingDeb = false
