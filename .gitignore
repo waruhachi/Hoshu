@@ -1,0 +1,7 @@
+.theos
+.vscode
+.DS_Store
+
+buildServer.json
+
+/packages
