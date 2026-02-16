@@ -735,17 +735,6 @@ struct ContentView: View {
                 NSLog("[Hoshu] Cleaned rootless-patcher directory")
             }
 
-            // Reset selected file path if it was in any of the cache directories
-            if let selectedPath = selectedFilePath,
-                selectedPath.hasPrefix(tempDirectory)
-                    || selectedPath.hasPrefix(stagingDirectory)
-                    || selectedPath.hasPrefix(importingDirectory)
-                    || selectedPath.hasPrefix(convertedDirectory)
-            {
-                selectedFilePath = nil
-                conversionCompleted = false
-            }
-
             // Reset all states
             resetAllState()
 
@@ -772,9 +761,20 @@ struct ContentView: View {
         appState.resetState()
 
         // Reset local ContentView state
+        resetLocalSelectionState()
+    }
+
+    private func resetLocalSelectionState() {
         selectedFilePath = nil
         conversionCompleted = false
         controlData = nil
+    }
+
+    private func dismissShareAlert(reset: Bool) {
+        appState.showShareSheet = false
+        if reset {
+            resetAllState()
+        }
     }
 
     // Initialize and make sure temp directory exists
@@ -796,6 +796,7 @@ struct ContentView: View {
 
     @MainActor
     private func presentNativeShareSheet(filePath: String) {
+        logTransition("Share", from: .idle, to: .presentingShare)
         guard
             let windowScene = UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene })
@@ -871,6 +872,39 @@ struct ContentView: View {
         }
     }
 
+    private enum WorkflowTransition: String {
+        case idle
+        case preflighting
+        case retrying
+        case downloading
+        case finalizing
+        case extracting
+        case parsingControl
+        case presentingShare
+        case cancelled
+        case failed
+        case completed
+    }
+
+    private func logTransition(
+        _ area: String,
+        from: WorkflowTransition,
+        to: WorkflowTransition,
+        operationID: UUID? = nil,
+        note: String? = nil
+    ) {
+        let transitionText = "state \(from.rawValue) -> \(to.rawValue)"
+        if let note, !note.isEmpty {
+            logLifecycle(
+                area,
+                "\(transitionText) (\(note))",
+                operationID: operationID
+            )
+        } else {
+            logLifecycle(area, transitionText, operationID: operationID)
+        }
+    }
+
     // Extract .deb file to staging directory using AuxiliaryExecute to run dpkg-deb commands
     private func extractDebFile(filePath: String) {
         let operationID = UUID()
@@ -887,6 +921,12 @@ struct ContentView: View {
         logLifecycle(
             "Extract",
             "Starting extraction for \(filePath)",
+            operationID: operationID
+        )
+        logTransition(
+            "Extract",
+            from: .idle,
+            to: .extracting,
             operationID: operationID
         )
 
@@ -912,6 +952,13 @@ struct ContentView: View {
                     "Extract",
                     "Extraction task cancelled before work started",
                     operationID: operationID
+                )
+                await self.logTransition(
+                    "Extract",
+                    from: .extracting,
+                    to: .cancelled,
+                    operationID: operationID,
+                    note: "before extraction started"
                 )
                 await self.clearExtractionOperationIDIfMatches(operationID)
                 return
@@ -942,6 +989,13 @@ struct ContentView: View {
                         "Extract",
                         "Extraction cancelled before dpkg invocation",
                         operationID: operationID
+                    )
+                    await self.logTransition(
+                        "Extract",
+                        from: .extracting,
+                        to: .cancelled,
+                        operationID: operationID,
+                        note: "before dpkg invocation"
                     )
                     await self.clearExtractionOperationIDIfMatches(operationID)
                     return
@@ -987,9 +1041,23 @@ struct ContentView: View {
                         "Extraction cancelled before control parsing",
                         operationID: operationID
                     )
+                    await self.logTransition(
+                        "Extract",
+                        from: .extracting,
+                        to: .cancelled,
+                        operationID: operationID,
+                        note: "before control parsing"
+                    )
                     await self.clearExtractionOperationIDIfMatches(operationID)
                     return
                 }
+
+                await self.logTransition(
+                    "Extract",
+                    from: .extracting,
+                    to: .parsingControl,
+                    operationID: operationID
+                )
 
                 // Parse the control file - still in background thread
                 await self.parseControlFile(extractionDir: extractionDir)
@@ -1004,6 +1072,13 @@ struct ContentView: View {
                         "Extraction cancelled while handling extraction error",
                         operationID: operationID
                     )
+                    await self.logTransition(
+                        "Extract",
+                        from: .extracting,
+                        to: .cancelled,
+                        operationID: operationID,
+                        note: "while handling extraction error"
+                    )
                     await self.clearExtractionOperationIDIfMatches(operationID)
                     return
                 }
@@ -1011,6 +1086,13 @@ struct ContentView: View {
                     "Extract",
                     "Extraction failed for \(filePath): \(error.localizedDescription)",
                     operationID: operationID
+                )
+                await self.logTransition(
+                    "Extract",
+                    from: .extracting,
+                    to: .failed,
+                    operationID: operationID,
+                    note: error.localizedDescription
                 )
                 await self.clearExtractionOperationIDIfMatches(operationID)
                 await MainActor.run {
@@ -1025,6 +1107,13 @@ struct ContentView: View {
                     "Extraction cancelled before completion state update",
                     operationID: operationID
                 )
+                await self.logTransition(
+                    "Extract",
+                    from: .parsingControl,
+                    to: .cancelled,
+                    operationID: operationID,
+                    note: "before completion state update"
+                )
                 await self.clearExtractionOperationIDIfMatches(operationID)
                 return
             }
@@ -1036,6 +1125,12 @@ struct ContentView: View {
             await self.logLifecycle(
                 "Extract",
                 "Extraction completed for \(filePath)",
+                operationID: operationID
+            )
+            await self.logTransition(
+                "Extract",
+                from: .parsingControl,
+                to: .completed,
                 operationID: operationID
             )
             await self.clearExtractionOperationIDIfMatches(operationID)
@@ -1539,8 +1634,7 @@ struct ContentView: View {
                                 filePath
                             )
                         }
-                        appState.showShareSheet = false
-                        resetAllState()
+                        dismissShareAlert(reset: true)
                     }
                 }
 
@@ -1552,8 +1646,7 @@ struct ContentView: View {
                                 filePath
                             )
                         }
-                        appState.showShareSheet = false
-                        resetAllState()
+                        dismissShareAlert(reset: true)
                     }
                 }
 
@@ -1565,8 +1658,7 @@ struct ContentView: View {
                                 filePath
                             )
                         }
-                        appState.showShareSheet = false
-                        resetAllState()
+                        dismissShareAlert(reset: true)
                     }
                 }
 
@@ -1578,7 +1670,7 @@ struct ContentView: View {
                         )
                         return
                     }
-                    appState.showShareSheet = false
+                    dismissShareAlert(reset: false)
                     Task { @MainActor in
                         try? await Task.sleep(nanoseconds: 150_000_000)
                         presentNativeShareSheet(filePath: filePath)
@@ -1586,8 +1678,7 @@ struct ContentView: View {
                 }
 
                 Button("Cancel", role: .cancel) {
-                    resetAllState()
-                    appState.showShareSheet = false
+                    dismissShareAlert(reset: true)
                 }
             } message: {
                 Text("Choose where to share the converted package")
@@ -1662,9 +1753,7 @@ struct ContentView: View {
                 else {
                     return
                 }
-                selectedFilePath = nil
-                conversionCompleted = false
-                controlData = nil
+                resetLocalSelectionState()
             }
             .alert("Rootless Package Detected", isPresented: $showRootlessAlert)
         {
@@ -1731,12 +1820,45 @@ extension View {
 
 // MARK: - URL Import Helpers
 extension ContentView {
+    private func normalizeURLInput(_ rawInput: String) -> String {
+        var normalized = rawInput.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+
+        let wrapperPairs: [(Character, Character)] = [
+            ("\"", "\""),
+            ("'", "'"),
+            ("<", ">"),
+            ("(", ")"),
+            ("[", "]"),
+            ("{", "}"),
+        ]
+
+        var didStrip = true
+        while didStrip, normalized.count >= 2 {
+            didStrip = false
+            for (open, close) in wrapperPairs {
+                guard normalized.first == open, normalized.last == close else {
+                    continue
+                }
+                normalized = String(normalized.dropFirst().dropLast())
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                didStrip = true
+                break
+            }
+        }
+
+        if normalized.lowercased().hasPrefix("www.") {
+            normalized = "https://" + normalized
+        }
+
+        return normalized
+    }
+
     @MainActor
     private func submitURLImportFromAlert() {
         guard !isPreflighting && !isDownloading else { return }
-        let normalized = urlToImport.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
+        let normalized = normalizeURLInput(urlToImport)
         guard isPotentiallyValidURL(normalized) else {
             downloadErrorAlert = DownloadErrorAlert(
                 message: "Please enter a valid http(s) URL."
@@ -1807,6 +1929,12 @@ extension ContentView {
         logLifecycle(
             "Download",
             "Starting preflight for \(url.absoluteString)",
+            operationID: operationID
+        )
+        logTransition(
+            "Download",
+            from: .idle,
+            to: .preflighting,
             operationID: operationID
         )
         showURLImportPrompt = false
@@ -1941,6 +2069,12 @@ extension ContentView {
             "Starting retry workflow for \(resolvedFilename)",
             operationID: effectiveOperationID
         )
+        logTransition(
+            "Download",
+            from: .preflighting,
+            to: .retrying,
+            operationID: effectiveOperationID
+        )
         retryAttempt = 0
         retryTask?.cancel()
         retryTask = nil
@@ -1985,6 +2119,13 @@ extension ContentView {
             "Download",
             "Begin transfer attempt \(attempt) for \(resolvedFilename)",
             operationID: operationID
+        )
+        logTransition(
+            "Download",
+            from: .retrying,
+            to: .downloading,
+            operationID: operationID,
+            note: "attempt \(attempt)"
         )
         isDownloading = true
         appState.isParsingDeb = true
@@ -2081,6 +2222,12 @@ extension ContentView {
         filename: String,
         operationID: UUID
     ) {
+        logTransition(
+            "Download",
+            from: .downloading,
+            to: .finalizing,
+            operationID: operationID
+        )
         let fileManager = FileManager.default
         let cleanedName = filename.cleanIOSFileSuffix()
         let destinationPath = importingDirectory + cleanedName
@@ -2103,6 +2250,12 @@ extension ContentView {
                 "Download finalized at \(destinationPath); starting extraction",
                 operationID: operationID
             )
+            logTransition(
+                "Download",
+                from: .finalizing,
+                to: .extracting,
+                operationID: operationID
+            )
             clearDownloadOperationIDIfMatches(operationID)
             extractDebFile(filePath: destinationPath)
         } catch {
@@ -2123,6 +2276,13 @@ extension ContentView {
             "Download",
             "Download workflow failed: \(message)",
             operationID: effectiveOperationID
+        )
+        logTransition(
+            "Download",
+            from: .downloading,
+            to: .failed,
+            operationID: effectiveOperationID,
+            note: message
         )
         downloadErrorAlert = DownloadErrorAlert(message: message)
         retryTask?.cancel()
@@ -2250,6 +2410,12 @@ extension ContentView {
         logLifecycle(
             "Download",
             "Cancellation requested",
+            operationID: downloadOperationID
+        )
+        logTransition(
+            "Download",
+            from: .downloading,
+            to: .cancelled,
             operationID: downloadOperationID
         )
         cancelRequested = true

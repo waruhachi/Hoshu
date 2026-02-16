@@ -28,6 +28,32 @@ final class DebConversionExecutor {
         }
     }
 
+    private enum ConvertTransition: String {
+        case idle
+        case running
+        case outputDetected
+        case completed
+        case stopped
+        case failed
+    }
+
+    private func logTransition(
+        from: ConvertTransition,
+        to: ConvertTransition,
+        operationID: UUID? = nil,
+        note: String? = nil
+    ) {
+        let transitionText = "state \(from.rawValue) -> \(to.rawValue)"
+        if let note, !note.isEmpty {
+            logLifecycle(
+                "\(transitionText) (\(note))",
+                operationID: operationID
+            )
+        } else {
+            logLifecycle(transitionText, operationID: operationID)
+        }
+    }
+
     init(
         outputHandler: @escaping (String) -> Void = { _ in },
         completionHandler: @escaping (Bool) -> Void,
@@ -54,6 +80,7 @@ final class DebConversionExecutor {
             "Starting conversion for \(filePath)",
             operationID: operationID
         )
+        logTransition(from: .idle, to: .running, operationID: operationID)
 
         isRunning = true
         didComplete = false
@@ -137,6 +164,11 @@ final class DebConversionExecutor {
             "Detected converted package path in process output",
             operationID: conversionOperationID
         )
+        logTransition(
+            from: .running,
+            to: .outputDetected,
+            operationID: conversionOperationID
+        )
 
         let lines = output.components(separatedBy: .newlines)
         for line in lines {
@@ -196,6 +228,11 @@ final class DebConversionExecutor {
             "Stopping conversion and cancelling execution task",
             operationID: conversionOperationID
         )
+        logTransition(
+            from: .running,
+            to: .stopped,
+            operationID: conversionOperationID
+        )
         executionTask?.cancel()
         executionTask = nil
         isRunning = false
@@ -207,6 +244,11 @@ final class DebConversionExecutor {
         didComplete = true
         logLifecycle(
             "Finishing conversion callback. success=\(success)",
+            operationID: conversionOperationID
+        )
+        logTransition(
+            from: .running,
+            to: success ? .completed : .failed,
             operationID: conversionOperationID
         )
         conversionOperationID = nil
