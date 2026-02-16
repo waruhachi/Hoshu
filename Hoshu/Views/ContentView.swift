@@ -5,27 +5,6 @@ import MobileCoreServices
 import SwiftUI
 import UniformTypeIdentifiers
 
-// UIActivityViewController wrapper for SwiftUI
-struct ShareSheetView: UIViewControllerRepresentable {
-    let filePath: String
-
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let fileURL = URL(fileURLWithPath: filePath)
-        let activityViewController = UIActivityViewController(
-            activityItems: [fileURL],
-            applicationActivities: nil
-        )
-        return activityViewController
-    }
-
-    func updateUIViewController(
-        _ uiViewController: UIActivityViewController,
-        context: Context
-    ) {
-        // Nothing to do here
-    }
-}
-
 // Alternative File Picker View that looks like a TableView
 struct AlternativeFilePicker: View {
     @Binding var isPresented: Bool
@@ -586,7 +565,6 @@ struct ContentView: View {
     @State private var isAlternativeFilePickerPresented = false
     @State private var selectedFilePath: String?
     @State private var isTerminalViewPresented = false
-    @State private var showSystemShareSheet = false
     @EnvironmentObject private var appState: AppState
     @State private var conversionCompleted = false
     @State private var controlData: Control? = nil
@@ -816,19 +794,65 @@ struct ContentView: View {
         }
     }
 
+    @MainActor
+    private func presentNativeShareSheet(filePath: String) {
+        guard
+            let windowScene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive }),
+            let presenter = windowScene.windows
+                .first(where: { $0.isKeyWindow })?.rootViewController
+        else {
+            logLifecycle(
+                "Share",
+                "Unable to open native share sheet: no active presenter"
+            )
+            return
+        }
+
+        let fileURL = URL(fileURLWithPath: filePath)
+        let activityViewController = UIActivityViewController(
+            activityItems: [fileURL],
+            applicationActivities: nil
+        )
+
+        activityViewController.completionWithItemsHandler = {
+            _,
+            _,
+            _,
+            _ in
+            Task { @MainActor in
+                self.resetAllState()
+            }
+        }
+
+        if let popover = activityViewController.popoverPresentationController {
+            popover.sourceView = presenter.view
+            popover.sourceRect = CGRect(
+                x: presenter.view.bounds.midX,
+                y: presenter.view.bounds.midY,
+                width: 1,
+                height: 1
+            )
+            popover.permittedArrowDirections = []
+        }
+
+        presenter.present(activityViewController, animated: true)
+    }
+
     private func shortOperationID(_ id: UUID?) -> String? {
         guard let id else { return nil }
         return String(id.uuidString.prefix(8))
     }
 
+    @MainActor
     private func clearExtractionOperationIDIfMatches(_ id: UUID) {
-        runOnMain {
-            if self.extractionOperationID == id {
-                self.extractionOperationID = nil
-            }
+        if extractionOperationID == id {
+            extractionOperationID = nil
         }
     }
 
+    @MainActor
     private func clearDownloadOperationIDIfMatches(_ id: UUID) {
         if downloadOperationID == id {
             downloadOperationID = nil
@@ -884,12 +908,12 @@ struct ContentView: View {
         // Perform extraction in background to prevent UI freezing
         extractionTask = Task.detached(priority: .userInitiated) { [self] in
             guard !Task.isCancelled else {
-                logLifecycle(
+                await self.logLifecycle(
                     "Extract",
                     "Extraction task cancelled before work started",
                     operationID: operationID
                 )
-                clearExtractionOperationIDIfMatches(operationID)
+                await self.clearExtractionOperationIDIfMatches(operationID)
                 return
             }
 
@@ -914,12 +938,12 @@ struct ContentView: View {
                 )
 
                 guard !Task.isCancelled else {
-                    logLifecycle(
+                    await self.logLifecycle(
                         "Extract",
                         "Extraction cancelled before dpkg invocation",
                         operationID: operationID
                     )
-                    clearExtractionOperationIDIfMatches(operationID)
+                    await self.clearExtractionOperationIDIfMatches(operationID)
                     return
                 }
 
@@ -958,63 +982,63 @@ struct ContentView: View {
                 )
 
                 guard !Task.isCancelled else {
-                    logLifecycle(
+                    await self.logLifecycle(
                         "Extract",
                         "Extraction cancelled before control parsing",
                         operationID: operationID
                     )
-                    clearExtractionOperationIDIfMatches(operationID)
+                    await self.clearExtractionOperationIDIfMatches(operationID)
                     return
                 }
 
                 // Parse the control file - still in background thread
-                self.parseControlFile(extractionDir: extractionDir)
+                await self.parseControlFile(extractionDir: extractionDir)
 
             } catch {
                 NSLog(
                     "[Hoshu] Error extracting .deb: \(error.localizedDescription)"
                 )
                 if Task.isCancelled {
-                    logLifecycle(
+                    await self.logLifecycle(
                         "Extract",
                         "Extraction cancelled while handling extraction error",
                         operationID: operationID
                     )
-                    clearExtractionOperationIDIfMatches(operationID)
+                    await self.clearExtractionOperationIDIfMatches(operationID)
                     return
                 }
-                logLifecycle(
+                await self.logLifecycle(
                     "Extract",
                     "Extraction failed for \(filePath): \(error.localizedDescription)",
                     operationID: operationID
                 )
-                clearExtractionOperationIDIfMatches(operationID)
-                runOnMain {
+                await self.clearExtractionOperationIDIfMatches(operationID)
+                await MainActor.run {
                     self.appState.isParsingDeb = false
                 }
                 return
             }
 
             guard !Task.isCancelled else {
-                logLifecycle(
+                await self.logLifecycle(
                     "Extract",
                     "Extraction cancelled before completion state update",
                     operationID: operationID
                 )
-                clearExtractionOperationIDIfMatches(operationID)
+                await self.clearExtractionOperationIDIfMatches(operationID)
                 return
             }
 
             // Set parsing state back to false when complete
-            runOnMain {
+            await MainActor.run {
                 self.appState.isParsingDeb = false
             }
-            logLifecycle(
+            await self.logLifecycle(
                 "Extract",
                 "Extraction completed for \(filePath)",
                 operationID: operationID
             )
-            clearExtractionOperationIDIfMatches(operationID)
+            await self.clearExtractionOperationIDIfMatches(operationID)
         }
     }
 
@@ -1547,9 +1571,18 @@ struct ContentView: View {
                 }
 
                 Button("Share") {
-                    showSystemShareSheet = true
+                    guard let filePath = appState.convertedFilePath else {
+                        logLifecycle(
+                            "Share",
+                            "Unable to open system share sheet: converted file path was nil"
+                        )
+                        return
+                    }
                     appState.showShareSheet = false
-                    resetAllState()
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 150_000_000)
+                        presentNativeShareSheet(filePath: filePath)
+                    }
                 }
 
                 Button("Cancel", role: .cancel) {
@@ -1558,17 +1591,6 @@ struct ContentView: View {
                 }
             } message: {
                 Text("Choose where to share the converted package")
-            }
-            .sheet(
-                isPresented: $showSystemShareSheet,
-                onDismiss: {
-                    // Reset app state after the system share sheet is dismissed
-                    appState.resetState()
-                }
-            ) {
-                if let filePath = appState.convertedFilePath {
-                    ShareSheetView(filePath: filePath)
-                }
             }
             .fullScreenCover(isPresented: $isAlternativeFilePickerPresented) {
                 // Show our custom alternative file picker when requested
@@ -1635,7 +1657,11 @@ struct ContentView: View {
                 NotificationCenter.default.publisher(
                     for: Notification.Name("hoshuclearSelectedFile")
                 )
-            ) { _ in
+            ) { notification in
+                guard (notification.object as? String) == "conversion-failed"
+                else {
+                    return
+                }
                 selectedFilePath = nil
                 conversionCompleted = false
                 controlData = nil
@@ -1664,9 +1690,14 @@ struct ContentView: View {
                 )
                 .autocapitalization(.none)
                 .disableAutocorrection(true)
+                .keyboardType(.URL)
+                .submitLabel(.go)
+                .onSubmit {
+                    submitURLImportFromAlert()
+                }
                 Button("Cancel", role: .cancel) {}
-                Button("Download") { startURLPreflight() }
-                    .disabled(!isPotentiallyValidURL(urlToImport))
+                Button("Submit") { submitURLImportFromAlert() }
+                    .keyboardShortcut(.defaultAction)
             } message: {
                 Text("Enter a URL. We'll verify and download the .deb.")
             }
@@ -1700,6 +1731,22 @@ extension View {
 
 // MARK: - URL Import Helpers
 extension ContentView {
+    @MainActor
+    private func submitURLImportFromAlert() {
+        guard !isPreflighting && !isDownloading else { return }
+        let normalized = urlToImport.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        guard isPotentiallyValidURL(normalized) else {
+            downloadErrorAlert = DownloadErrorAlert(
+                message: "Please enter a valid http(s) URL."
+            )
+            return
+        }
+        urlToImport = normalized
+        startURLPreflight()
+    }
+
     private func isPotentiallyValidURL(_ text: String) -> Bool {
         guard
             let url = URL(
@@ -2166,7 +2213,19 @@ private class DebURLDownloader: NSObject, URLSessionDownloadDelegate {
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
-        completion(location, nil)
+        let fileManager = FileManager.default
+        let preservedURL = fileManager.temporaryDirectory
+            .appendingPathComponent("hoshu-download-\(UUID().uuidString).tmp")
+
+        do {
+            if fileManager.fileExists(atPath: preservedURL.path) {
+                try fileManager.removeItem(at: preservedURL)
+            }
+            try fileManager.moveItem(at: location, to: preservedURL)
+            completion(preservedURL, nil)
+        } catch {
+            completion(nil, error)
+        }
     }
 
     func urlSession(

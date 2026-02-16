@@ -46,7 +46,7 @@ struct TerminalView: View {
                                     name: Notification.Name(
                                         "hoshuclearSelectedFile"
                                     ),
-                                    object: nil
+                                    object: "conversion-failed"
                                 )
                             }
 
