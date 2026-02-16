@@ -607,6 +607,7 @@ struct ContentView: View {
     @State private var isUnknownSize: Bool = false
     @State private var downloadedBytes: Int64 = 0
     @State private var retryAttempt: Int = 0
+    @State private var retryTask: Task<Void, Never>? = nil
     private let maxDownloadRetries: Int = 3
     @State private var cancelRequested: Bool = false
 
@@ -1618,6 +1619,8 @@ extension ContentView {
         isUnknownSize = false
         retryAttempt = 0
         cancelRequested = false
+        retryTask?.cancel()
+        retryTask = nil
         ensureTempDirectoryExists()
 
         var headRequest = URLRequest(url: url)
@@ -1695,6 +1698,8 @@ extension ContentView {
 
     private func startDownloadWithRetry(url: URL, resolvedFilename: String) {
         retryAttempt = 0
+        retryTask?.cancel()
+        retryTask = nil
         attemptDownload(
             url: url,
             resolvedFilename: resolvedFilename,
@@ -1753,13 +1758,15 @@ extension ContentView {
                             && attempt < maxDownloadRetries
                         {
                             let delay = pow(2.0, Double(attempt - 1))
-                            Task {
+                            retryTask?.cancel()
+                            retryTask = Task {
                                 let delayNanoseconds = UInt64(
                                     delay * 1_000_000_000
                                 )
                                 try? await Task.sleep(
                                     nanoseconds: delayNanoseconds
                                 )
+                                guard !Task.isCancelled else { return }
                                 attemptDownload(
                                     url: url,
                                     resolvedFilename: resolvedFilename,
@@ -1797,6 +1804,9 @@ extension ContentView {
             )
             selectedFilePath = destinationPath
             isDownloading = false
+            activeDownloader = nil
+            retryTask?.cancel()
+            retryTask = nil
             appState.isParsingDeb = true  // keep parsing flag until extraction done
             extractDebFile(filePath: destinationPath)
         } catch {
@@ -1806,6 +1816,9 @@ extension ContentView {
 
     private func handleDownloadError(_ message: String) {
         downloadErrorAlert = DownloadErrorAlert(message: message)
+        retryTask?.cancel()
+        retryTask = nil
+        activeDownloader = nil
         isDownloading = false
         isPreflighting = false
         appState.isParsingDeb = false
@@ -1908,6 +1921,8 @@ extension DebURLDownloader {
 extension ContentView {
     private func cancelDownload() {
         cancelRequested = true
+        retryTask?.cancel()
+        retryTask = nil
         activeDownloader?.cancel()
         activeDownloader = nil
         isDownloading = false

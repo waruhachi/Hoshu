@@ -4,6 +4,7 @@ import Foundation
 final class DebConversionExecutor {
     private var isRunning = false
     private var didComplete = false
+    private var executionTask: Task<Void, Never>?
     private var outputHandler: (String) -> Void
     private var completionHandler: (Bool) -> Void
     private var convertedFilePath: String?
@@ -29,6 +30,8 @@ final class DebConversionExecutor {
 
         isRunning = true
         didComplete = false
+        executionTask?.cancel()
+        executionTask = nil
 
         outputHandler("[+] Loading file from \(filePath)...\n")
 
@@ -44,7 +47,7 @@ final class DebConversionExecutor {
                 }
             } ?? []
 
-        Task.detached(priority: .userInitiated) { [weak self] in
+        executionTask = Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
 
             AuxiliaryExecute.spawn(
@@ -55,6 +58,7 @@ final class DebConversionExecutor {
                 stdoutBlock: { [weak self] stdout in
                     guard let self = self else { return }
                     Task { @MainActor in
+                        guard self.isRunning else { return }
                         self.outputHandler(stdout)
                         self.captureConvertedPath(from: stdout)
                     }
@@ -62,12 +66,14 @@ final class DebConversionExecutor {
                 stderrBlock: { [weak self] stderr in
                     guard let self = self else { return }
                     Task { @MainActor in
+                        guard self.isRunning else { return }
                         self.outputHandler("[+] Error: \(stderr)")
                     }
                 }
             ) { [weak self] _ in
                 guard let self = self else { return }
                 Task { @MainActor in
+                    guard self.isRunning else { return }
                     self.outputHandler(
                         "\n[+] Job completed. You may close this window.\n"
                     )
@@ -78,6 +84,7 @@ final class DebConversionExecutor {
                     }
 
                     self.isRunning = false
+                    self.executionTask = nil
                     self.finish(success: self.conversionSucceeded)
                 }
             }
@@ -133,6 +140,8 @@ final class DebConversionExecutor {
     }
 
     func stop() {
+        executionTask?.cancel()
+        executionTask = nil
         isRunning = false
         finish(success: false)
     }
