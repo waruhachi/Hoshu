@@ -49,6 +49,8 @@ final class DebConversionExecutor {
             } ?? []
 
         executionTask = Task.detached(priority: .userInitiated) {
+            guard !Task.isCancelled else { return }
+
             AuxiliaryExecute.spawn(
                 command: "/var/jb/usr/local/bin/rootless-patcher",
                 args: [filePath],

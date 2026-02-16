@@ -608,6 +608,7 @@ struct ContentView: View {
     @State private var downloadedBytes: Int64 = 0
     @State private var retryAttempt: Int = 0
     @State private var retryTask: Task<Void, Never>? = nil
+    @State private var extractionTask: Task<Void, Never>? = nil
     private let maxDownloadRetries: Int = 3
     @State private var cancelRequested: Bool = false
 
@@ -775,6 +776,9 @@ struct ContentView: View {
 
     // This function resets both app state and local view state
     private func resetAllState() {
+        extractionTask?.cancel()
+        extractionTask = nil
+
         // Reset AppState
         appState.resetState()
 
@@ -795,23 +799,34 @@ struct ContentView: View {
         extractDebFile(filePath: fileURL.path)
     }
 
+    private func runOnMain(_ operation: @escaping @MainActor () -> Void) {
+        Task { @MainActor in
+            operation()
+        }
+    }
+
     // Extract .deb file to staging directory using AuxiliaryExecute to run dpkg-deb commands
     private func extractDebFile(filePath: String) {
         guard FileManager.default.fileExists(atPath: filePath) else {
             NSLog("[Hoshu] File does not exist at path: \(filePath)")
-            Task { @MainActor in
+            runOnMain {
                 self.appState.isParsingDeb = false
             }
             return
         }
 
         // Set parsing state to true
-        Task { @MainActor in
+        runOnMain {
             self.appState.isParsingDeb = true
         }
 
+        extractionTask?.cancel()
+        extractionTask = nil
+
         // Perform extraction in background to prevent UI freezing
-        Task.detached(priority: .userInitiated) { [self] in
+        extractionTask = Task.detached(priority: .userInitiated) { [self] in
+            guard !Task.isCancelled else { return }
+
             // Get filename without extension
             let fileURL = URL(fileURLWithPath: filePath)
             let filename = fileURL.deletingPathExtension().lastPathComponent
@@ -831,6 +846,8 @@ struct ContentView: View {
                     atPath: extractionDir,
                     withIntermediateDirectories: true
                 )
+
+                guard !Task.isCancelled else { return }
 
                 let environmentPath: [String] =
                     ProcessInfo
@@ -866,6 +883,8 @@ struct ContentView: View {
                     "[Hoshu] Successfully extracted \(filename) to \(extractionDir)"
                 )
 
+                guard !Task.isCancelled else { return }
+
                 // Parse the control file - still in background thread
                 self.parseControlFile(extractionDir: extractionDir)
 
@@ -873,14 +892,17 @@ struct ContentView: View {
                 NSLog(
                     "[Hoshu] Error extracting .deb: \(error.localizedDescription)"
                 )
-                Task { @MainActor in
+                if Task.isCancelled { return }
+                runOnMain {
                     self.appState.isParsingDeb = false
                 }
                 return
             }
 
+            guard !Task.isCancelled else { return }
+
             // Set parsing state back to false when complete
-            Task { @MainActor in
+            runOnMain {
                 self.appState.isParsingDeb = false
             }
         }
@@ -888,6 +910,8 @@ struct ContentView: View {
 
     // Parse the control file from the extracted .deb
     private func parseControlFile(extractionDir: String) {
+        if Task.isCancelled { return }
+
         let controlFilePath = extractionDir + "/DEBIAN/control"
         let fileManager = FileManager.default
 
@@ -895,7 +919,7 @@ struct ContentView: View {
             NSLog(
                 "[Hoshu] Control file does not exist at path: \(controlFilePath)"
             )
-            Task { @MainActor in
+            runOnMain {
                 self.appState.isParsingDeb = false
             }
             return
@@ -986,6 +1010,8 @@ struct ContentView: View {
             let isDetectedAsRootless =
                 isRootlessFilename || isRootlessArchitecture
 
+            guard !Task.isCancelled else { return }
+
             let control = Control(
                 id: id,
                 package: package,
@@ -1005,14 +1031,10 @@ struct ContentView: View {
                 isDetectedAsRootless: isDetectedAsRootless
             )
 
-            if isDetectedAsRootless {
-                Task { @MainActor in
+            runOnMain {
+                if isDetectedAsRootless {
                     self.showRootlessAlert = true
                 }
-            }
-
-            // Update the state with the parsed control data
-            Task { @MainActor in
                 self.controlData = control
             }
 
@@ -1020,7 +1042,8 @@ struct ContentView: View {
             NSLog(
                 "[Hoshu] Error reading control file: \(error.localizedDescription)"
             )
-            Task { @MainActor in
+            if Task.isCancelled { return }
+            runOnMain {
                 self.appState.isParsingDeb = false
             }
         }
