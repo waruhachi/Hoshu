@@ -44,7 +44,7 @@ final class DebConversionExecutor {
                 }
             } ?? []
 
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        Task.detached(priority: .userInitiated) { [weak self] in
             guard let self = self else { return }
 
             AuxiliaryExecute.spawn(
@@ -54,20 +54,20 @@ final class DebConversionExecutor {
                 timeout: 0,
                 stdoutBlock: { [weak self] stdout in
                     guard let self = self else { return }
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         self.outputHandler(stdout)
                         self.captureConvertedPath(from: stdout)
                     }
                 },
                 stderrBlock: { [weak self] stderr in
                     guard let self = self else { return }
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         self.outputHandler("[+] Error: \(stderr)")
                     }
                 }
             ) { [weak self] _ in
                 guard let self = self else { return }
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.outputHandler(
                         "\n[+] Job completed. You may close this window.\n"
                     )

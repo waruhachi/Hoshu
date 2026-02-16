@@ -798,19 +798,19 @@ struct ContentView: View {
     private func extractDebFile(filePath: String) {
         guard FileManager.default.fileExists(atPath: filePath) else {
             NSLog("[Hoshu] File does not exist at path: \(filePath)")
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.appState.isParsingDeb = false
             }
             return
         }
 
         // Set parsing state to true
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.appState.isParsingDeb = true
         }
 
         // Perform extraction in background to prevent UI freezing
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task.detached(priority: .userInitiated) { [self] in
             // Get filename without extension
             let fileURL = URL(fileURLWithPath: filePath)
             let filename = fileURL.deletingPathExtension().lastPathComponent
@@ -872,14 +872,14 @@ struct ContentView: View {
                 NSLog(
                     "[Hoshu] Error extracting .deb: \(error.localizedDescription)"
                 )
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.appState.isParsingDeb = false
                 }
                 return
             }
 
             // Set parsing state back to false when complete
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.appState.isParsingDeb = false
             }
         }
@@ -894,7 +894,7 @@ struct ContentView: View {
             NSLog(
                 "[Hoshu] Control file does not exist at path: \(controlFilePath)"
             )
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.appState.isParsingDeb = false
             }
             return
@@ -1005,13 +1005,13 @@ struct ContentView: View {
             )
 
             if isDetectedAsRootless {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.showRootlessAlert = true
                 }
             }
 
             // Update the state with the parsed control data
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.controlData = control
             }
 
@@ -1019,7 +1019,7 @@ struct ContentView: View {
             NSLog(
                 "[Hoshu] Error reading control file: \(error.localizedDescription)"
             )
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.appState.isParsingDeb = false
             }
         }
@@ -1629,7 +1629,7 @@ extension ContentView {
             error in
             if cancelRequested { return }
             if error != nil {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     if !cancelRequested {
                         isPreflighting = false
                         startDownloadWithRetry(
@@ -1641,7 +1641,7 @@ extension ContentView {
                 return
             }
             guard let http = response as? HTTPURLResponse else {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     if !cancelRequested {
                         isPreflighting = false
                         startDownloadWithRetry(
@@ -1653,7 +1653,7 @@ extension ContentView {
                 return
             }
             if http.statusCode == 405 {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     if !cancelRequested {
                         isPreflighting = false
                         startDownloadWithRetry(
@@ -1665,7 +1665,7 @@ extension ContentView {
                 return
             }
             guard (200..<400).contains(http.statusCode) else {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     if !cancelRequested {
                         isPreflighting = false
                         handleDownloadError("HEAD status \(http.statusCode)")
@@ -1680,7 +1680,7 @@ extension ContentView {
                 originalURL: url,
                 contentDisposition: contentDisp
             )
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 if !cancelRequested {
                     isPreflighting = false
                     startDownloadWithRetry(
@@ -1722,7 +1722,7 @@ extension ContentView {
         appState.isParsingDeb = true
         let downloader = DebURLDownloader(
             progressHandler: { progress, bytesWritten, totalBytes, startedAt in
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.downloadProgress = progress
                     self.downloadedBytes = bytesWritten
                     if totalBytes > 0 {
@@ -1747,15 +1747,19 @@ extension ContentView {
             },
             completion: { tempURL, error in
                 if let error = error {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         if cancelRequested { return }
                         if isTransientError(error)
                             && attempt < maxDownloadRetries
                         {
                             let delay = pow(2.0, Double(attempt - 1))
-                            DispatchQueue.main.asyncAfter(
-                                deadline: .now() + delay
-                            ) {
+                            Task {
+                                let delayNanoseconds = UInt64(
+                                    delay * 1_000_000_000
+                                )
+                                try? await Task.sleep(
+                                    nanoseconds: delayNanoseconds
+                                )
                                 attemptDownload(
                                     url: url,
                                     resolvedFilename: resolvedFilename,
@@ -1769,7 +1773,7 @@ extension ContentView {
                     return
                 }
                 guard let tempURL else {
-                    DispatchQueue.main.async { handleDownloadError("No data") }
+                    Task { @MainActor in handleDownloadError("No data") }
                     return
                 }
                 finalizeDownload(tempURL: tempURL, filename: resolvedFilename)
