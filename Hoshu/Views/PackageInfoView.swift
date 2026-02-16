@@ -31,7 +31,7 @@ struct PackageView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 64, height: 64)
-                            .cornerRadius(12)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
                     case .failure(_), .empty:
                         fallbackIconView
                     @unknown default:
@@ -50,7 +50,7 @@ struct PackageView: View {
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(width: 64, height: 64)
-            .foregroundColor(.gray)
+            .foregroundStyle(.gray)
     }
 
     // Package header info (name and version)
@@ -60,8 +60,8 @@ struct PackageView: View {
             {
                 Text(name)
                     .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .bold()
+                    .foregroundStyle(.white)
             }
 
             if let version = controlData.getValue(forField: "version"),
@@ -69,7 +69,7 @@ struct PackageView: View {
             {
                 Text("Version \(version)")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundStyle(.gray)
             }
         }
     }
@@ -81,9 +81,9 @@ struct PackageView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Description")
                         .font(.headline)
-                        .foregroundColor(.gray)
+                        .foregroundStyle(.gray)
                     Text(controlData.packageDescription)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                         .multilineTextAlignment(.leading)
                 }
                 .padding(.vertical, 8)
@@ -140,9 +140,9 @@ struct PackageView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Dependencies")
                         .font(.headline)
-                        .foregroundColor(.gray)
+                        .foregroundStyle(.gray)
                     Text(depends)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                         .multilineTextAlignment(.leading)
                 }
                 .padding(.vertical, 8)
@@ -159,9 +159,9 @@ struct PackageView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Conflicts")
                         .font(.headline)
-                        .foregroundColor(.gray)
+                        .foregroundStyle(.gray)
                     Text(conflicts)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                         .multilineTextAlignment(.leading)
                 }
                 .padding(.vertical, 8)
@@ -279,7 +279,7 @@ struct PackageView: View {
                     NSLog("[Hoshu] Dismiss button tapped")
                     dismiss()
                 }
-                .foregroundColor(.white)
+                .foregroundStyle(.white)
             }
         }
         // For iOS 16+, use the native toolbarBackground modifier
@@ -338,12 +338,12 @@ struct InfoRow: View {
             Text(label)
                 .font(.subheadline)
                 .fontWeight(.medium)
-                .foregroundColor(.gray)
+                .foregroundStyle(.gray)
                 .frame(width: 100, alignment: .leading)
 
             Text(value)
                 .font(.subheadline)
-                .foregroundColor(.white)
+                .foregroundStyle(.white)
                 .multilineTextAlignment(.leading)
 
             Spacer()

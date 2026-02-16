@@ -38,31 +38,31 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("App Settings")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                         Toggle(
                             "Alternative File Picker",
                             isOn: $appState.showAlternativeFilePicker
                         )
                         .toggleStyle(SwitchToggleStyle(tint: .gray))
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Maintenance")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                         Button {
                             activeAlert = .clearCache
                         } label: {
                             Label("Clear Cache", systemImage: "trash")
-                                .foregroundColor(.red)
+                                .foregroundStyle(.red)
                         }
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text("CREDITS")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                         ForEach(Contributor.samples) { contributor in
                             ContributorView(
                                 imageURL: contributor.imageURL,
@@ -82,7 +82,7 @@ struct SettingsView: View {
                     Button("Done") {
                         dismiss()
                     }
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
                 }
             }
             .alert(item: $activeAlert) { alert in

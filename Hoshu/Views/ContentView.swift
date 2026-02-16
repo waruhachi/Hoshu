@@ -173,8 +173,8 @@ struct AlternativeFilePicker: View {
                     )
                     .foregroundStyle(.white)
                     .tint(.white)
-                    .disableAutocorrection(true)
-                    .autocapitalization(.none)
+                    .autocorrectionDisabled(true)
+                    .textInputAutocapitalization(.never)
                     .onChange(of: searchText) { _ in
                         checkForDirectoryPath()
                     }
@@ -796,7 +796,7 @@ struct ContentView: View {
 
     @MainActor
     private func presentNativeShareSheet(filePath: String) {
-        logTransition("Share", from: .idle, to: .presentingShare)
+        logShareTransition(from: .idle, to: .presenting)
         guard
             let windowScene = UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene })
@@ -872,36 +872,82 @@ struct ContentView: View {
         }
     }
 
-    private enum WorkflowTransition: String {
+    private enum DownloadTransitionState: String {
         case idle
         case preflighting
         case retrying
         case downloading
         case finalizing
+        case handoffToExtract
+        case cancelled
+        case failed
+    }
+
+    private enum ExtractTransitionState: String {
+        case idle
         case extracting
         case parsingControl
-        case presentingShare
         case cancelled
         case failed
         case completed
     }
 
-    private func logTransition(
-        _ area: String,
-        from: WorkflowTransition,
-        to: WorkflowTransition,
+    private enum ShareTransitionState: String {
+        case idle
+        case presenting
+    }
+
+    private func logDownloadTransition(
+        from: DownloadTransitionState,
+        to: DownloadTransitionState,
         operationID: UUID? = nil,
         note: String? = nil
     ) {
         let transitionText = "state \(from.rawValue) -> \(to.rawValue)"
         if let note, !note.isEmpty {
             logLifecycle(
-                area,
+                "Download",
                 "\(transitionText) (\(note))",
                 operationID: operationID
             )
         } else {
-            logLifecycle(area, transitionText, operationID: operationID)
+            logLifecycle("Download", transitionText, operationID: operationID)
+        }
+    }
+
+    private func logExtractTransition(
+        from: ExtractTransitionState,
+        to: ExtractTransitionState,
+        operationID: UUID? = nil,
+        note: String? = nil
+    ) {
+        let transitionText = "state \(from.rawValue) -> \(to.rawValue)"
+        if let note, !note.isEmpty {
+            logLifecycle(
+                "Extract",
+                "\(transitionText) (\(note))",
+                operationID: operationID
+            )
+        } else {
+            logLifecycle("Extract", transitionText, operationID: operationID)
+        }
+    }
+
+    private func logShareTransition(
+        from: ShareTransitionState,
+        to: ShareTransitionState,
+        operationID: UUID? = nil,
+        note: String? = nil
+    ) {
+        let transitionText = "state \(from.rawValue) -> \(to.rawValue)"
+        if let note, !note.isEmpty {
+            logLifecycle(
+                "Share",
+                "\(transitionText) (\(note))",
+                operationID: operationID
+            )
+        } else {
+            logLifecycle("Share", transitionText, operationID: operationID)
         }
     }
 
@@ -923,8 +969,7 @@ struct ContentView: View {
             "Starting extraction for \(filePath)",
             operationID: operationID
         )
-        logTransition(
-            "Extract",
+        logExtractTransition(
             from: .idle,
             to: .extracting,
             operationID: operationID
@@ -953,8 +998,7 @@ struct ContentView: View {
                     "Extraction task cancelled before work started",
                     operationID: operationID
                 )
-                await self.logTransition(
-                    "Extract",
+                await self.logExtractTransition(
                     from: .extracting,
                     to: .cancelled,
                     operationID: operationID,
@@ -990,8 +1034,7 @@ struct ContentView: View {
                         "Extraction cancelled before dpkg invocation",
                         operationID: operationID
                     )
-                    await self.logTransition(
-                        "Extract",
+                    await self.logExtractTransition(
                         from: .extracting,
                         to: .cancelled,
                         operationID: operationID,
@@ -1041,8 +1084,7 @@ struct ContentView: View {
                         "Extraction cancelled before control parsing",
                         operationID: operationID
                     )
-                    await self.logTransition(
-                        "Extract",
+                    await self.logExtractTransition(
                         from: .extracting,
                         to: .cancelled,
                         operationID: operationID,
@@ -1052,8 +1094,7 @@ struct ContentView: View {
                     return
                 }
 
-                await self.logTransition(
-                    "Extract",
+                await self.logExtractTransition(
                     from: .extracting,
                     to: .parsingControl,
                     operationID: operationID
@@ -1072,8 +1113,7 @@ struct ContentView: View {
                         "Extraction cancelled while handling extraction error",
                         operationID: operationID
                     )
-                    await self.logTransition(
-                        "Extract",
+                    await self.logExtractTransition(
                         from: .extracting,
                         to: .cancelled,
                         operationID: operationID,
@@ -1087,8 +1127,7 @@ struct ContentView: View {
                     "Extraction failed for \(filePath): \(error.localizedDescription)",
                     operationID: operationID
                 )
-                await self.logTransition(
-                    "Extract",
+                await self.logExtractTransition(
                     from: .extracting,
                     to: .failed,
                     operationID: operationID,
@@ -1107,8 +1146,7 @@ struct ContentView: View {
                     "Extraction cancelled before completion state update",
                     operationID: operationID
                 )
-                await self.logTransition(
-                    "Extract",
+                await self.logExtractTransition(
                     from: .parsingControl,
                     to: .cancelled,
                     operationID: operationID,
@@ -1127,8 +1165,7 @@ struct ContentView: View {
                 "Extraction completed for \(filePath)",
                 operationID: operationID
             )
-            await self.logTransition(
-                "Extract",
+            await self.logExtractTransition(
                 from: .parsingControl,
                 to: .completed,
                 operationID: operationID
@@ -1777,8 +1814,8 @@ struct ContentView: View {
                     "URL",
                     text: $urlToImport
                 )
-                .autocapitalization(.none)
-                .disableAutocorrection(true)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
                 .keyboardType(.URL)
                 .submitLabel(.go)
                 .onSubmit {
@@ -1931,8 +1968,7 @@ extension ContentView {
             "Starting preflight for \(url.absoluteString)",
             operationID: operationID
         )
-        logTransition(
-            "Download",
+        logDownloadTransition(
             from: .idle,
             to: .preflighting,
             operationID: operationID
@@ -2069,8 +2105,7 @@ extension ContentView {
             "Starting retry workflow for \(resolvedFilename)",
             operationID: effectiveOperationID
         )
-        logTransition(
-            "Download",
+        logDownloadTransition(
             from: .preflighting,
             to: .retrying,
             operationID: effectiveOperationID
@@ -2120,8 +2155,7 @@ extension ContentView {
             "Begin transfer attempt \(attempt) for \(resolvedFilename)",
             operationID: operationID
         )
-        logTransition(
-            "Download",
+        logDownloadTransition(
             from: .retrying,
             to: .downloading,
             operationID: operationID,
@@ -2222,8 +2256,7 @@ extension ContentView {
         filename: String,
         operationID: UUID
     ) {
-        logTransition(
-            "Download",
+        logDownloadTransition(
             from: .downloading,
             to: .finalizing,
             operationID: operationID
@@ -2250,10 +2283,9 @@ extension ContentView {
                 "Download finalized at \(destinationPath); starting extraction",
                 operationID: operationID
             )
-            logTransition(
-                "Download",
+            logDownloadTransition(
                 from: .finalizing,
-                to: .extracting,
+                to: .handoffToExtract,
                 operationID: operationID
             )
             clearDownloadOperationIDIfMatches(operationID)
@@ -2277,8 +2309,7 @@ extension ContentView {
             "Download workflow failed: \(message)",
             operationID: effectiveOperationID
         )
-        logTransition(
-            "Download",
+        logDownloadTransition(
             from: .downloading,
             to: .failed,
             operationID: effectiveOperationID,
@@ -2412,8 +2443,7 @@ extension ContentView {
             "Cancellation requested",
             operationID: downloadOperationID
         )
-        logTransition(
-            "Download",
+        logDownloadTransition(
             from: .downloading,
             to: .cancelled,
             operationID: downloadOperationID

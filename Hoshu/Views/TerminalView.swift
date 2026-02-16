@@ -53,7 +53,7 @@ struct TerminalView: View {
                             terminalExecutor?.stop()
                         }) {
                             Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.white)
+                                .foregroundStyle(.white)
                                 .font(.system(size: 24))
                                 .padding()
                         }
@@ -68,7 +68,7 @@ struct TerminalView: View {
                                     + (cursorVisible && isRunning ? "█" : "")
                             )
                             .font(.system(size: 12, design: .monospaced))
-                            .foregroundColor(.white)
+                            .foregroundStyle(.white)
                             .padding(.horizontal, 8)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .id("output")

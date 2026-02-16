@@ -42,7 +42,7 @@ struct ContributorView: View {
                 }) {
                     Text(name)
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                 }
                 .buttonStyle(PlainButtonStyle())
 
@@ -54,7 +54,7 @@ struct ContributorView: View {
                 }) {
                     Text(contribution)
                         .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundStyle(.white.opacity(0.8))
                 }
                 .buttonStyle(PlainButtonStyle())
             }
