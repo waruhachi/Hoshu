@@ -865,8 +865,6 @@ struct ContentView: View {
                 Button("Cancel", role: .cancel) {}
                 Button("Submit") { submitURLImportFromAlert() }
                     .keyboardShortcut(.defaultAction)
-            } message: {
-                Text("Enter a URL. We'll verify and download the .deb.")
             }
             // Download error alert
             .alert(item: $urlImportCoordinator.downloadErrorAlert) { alert in
