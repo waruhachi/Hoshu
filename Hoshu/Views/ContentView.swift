@@ -106,7 +106,7 @@ struct AlternativeFilePicker: View {
             searchText.isEmpty
             ? directoryContents
             : directoryContents.filter {
-                $0.name.localizedCaseInsensitiveContains(searchText)
+                $0.name.localizedStandardContains(searchText)
             }
         return base.sorted { (a: FileItem, b: FileItem) -> Bool in
             switch sortOption {
@@ -252,43 +252,45 @@ struct AlternativeFilePicker: View {
                             )
 
                             // Root directory
-                            Text("/")
-                                .foregroundStyle(.white)
-                                .font(.system(size: 16))
-                                .onTapGesture {
-                                    navigateToDirectory("/")
-                                }
+                            Button {
+                                navigateToDirectory("/")
+                            } label: {
+                                Text("/")
+                                    .foregroundStyle(.white)
+                                    .font(.system(size: 16))
+                            }
+                            .buttonStyle(.plain)
 
                             // Other path components
                             ForEach(0..<pathComponents.count, id: \.self) {
                                 index in
                                 let component = pathComponents[index]
                                 if !component.isEmpty {
-                                    ZStack(alignment: .bottom) {
-                                        Text("\(component)")
-                                            .foregroundStyle(.white)
-                                            .font(.system(size: 16))
-                                            .lineLimit(1)
-                                            .onTapGesture {
-                                                // Calculate the path up to this component
-                                                let pathToHere =
-                                                    "/"
-                                                    + pathComponents[
-                                                        0...index
-                                                    ].joined(
-                                                        separator: "/"
-                                                    )
-                                                navigateToDirectory(
-                                                    pathToHere
-                                                )
-                                            }
+                                    Button {
+                                        // Calculate the path up to this component
+                                        let pathToHere =
+                                            "/"
+                                            + pathComponents[
+                                                0...index
+                                            ].joined(
+                                                separator: "/"
+                                            )
+                                        navigateToDirectory(pathToHere)
+                                    } label: {
+                                        ZStack(alignment: .bottom) {
+                                            Text("\(component)")
+                                                .foregroundStyle(.white)
+                                                .font(.system(size: 16))
+                                                .lineLimit(1)
 
-                                        // Custom underline compatible with iOS 15 and 16
-                                        Rectangle()
-                                            .frame(height: 2.0)
-                                            .foregroundStyle(.white)
-                                            .offset(y: 1)
+                                            // Custom underline compatible with iOS 15 and 16
+                                            Rectangle()
+                                                .frame(height: 2.0)
+                                                .foregroundStyle(.white)
+                                                .offset(y: 1)
+                                        }
                                     }
+                                    .buttonStyle(.plain)
 
                                     if index < pathComponents.count - 1 {
                                         Text("/")
@@ -313,39 +315,7 @@ struct AlternativeFilePicker: View {
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             ForEach(filteredContents) { item in
-                                HStack {
-                                    Image(systemName: item.iconName)
-                                        .foregroundStyle(item.color)
-                                        .frame(width: 25)
-
-                                    VStack(alignment: .leading) {
-                                        Text(item.name)
-                                            .foregroundStyle(
-                                                item.name.hasSuffix(".deb")
-                                                    || item.isDirectory
-                                                    ? .white : .gray
-                                            )
-
-                                        HStack {
-                                            Text(item.formattedDate)
-                                                .font(.system(size: 12))
-                                                .foregroundStyle(.gray)
-
-                                            if !item.isDirectory {
-                                                Text(item.formattedSize)
-                                                    .font(.system(size: 12))
-                                                    .foregroundStyle(.gray)
-                                            }
-                                        }
-                                    }
-
-                                    Spacer()
-                                }
-                                .padding(.vertical, 8)
-                                .padding(.horizontal, 16)
-                                .background(Color.black)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
+                                Button {
                                     if item.isDirectory {
                                         navigateToDirectory(item.path)
                                     } else if item.name.hasSuffix(".deb") {
@@ -355,7 +325,41 @@ struct AlternativeFilePicker: View {
                                         )
                                         isPresented = false
                                     }
+                                } label: {
+                                    HStack {
+                                        Image(systemName: item.iconName)
+                                            .foregroundStyle(item.color)
+                                            .frame(width: 25)
+
+                                        VStack(alignment: .leading) {
+                                            Text(item.name)
+                                                .foregroundStyle(
+                                                    item.name.hasSuffix(".deb")
+                                                        || item.isDirectory
+                                                        ? .white : .gray
+                                                )
+
+                                            HStack {
+                                                Text(item.formattedDate)
+                                                    .font(.system(size: 12))
+                                                    .foregroundStyle(.gray)
+
+                                                if !item.isDirectory {
+                                                    Text(item.formattedSize)
+                                                        .font(.system(size: 12))
+                                                        .foregroundStyle(.gray)
+                                                }
+                                            }
+                                        }
+
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 8)
+                                    .padding(.horizontal, 16)
+                                    .background(Color.black)
+                                    .contentShape(Rectangle())
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                         .background(Color.black)
@@ -1064,32 +1068,34 @@ struct ContentView: View {
                         // File name area with fixed height that opens package info when tapped
                         ZStack {
                             if let selectedPath = selectedFilePath {
-                                HStack {
-                                    // Left spacer to center the text
-                                    Spacer()
-
-                                    // Center: Filename + info icon
-                                    Text(
-                                        URL(fileURLWithPath: selectedPath)
-                                            .lastPathComponent
-                                            .cleanIOSFileSuffix()
-                                    )
-                                    .foregroundStyle(.white)
-
-                                    Image(systemName: "info.circle")
-                                        .foregroundStyle(.gray)
-                                        .font(.system(size: 14))
-
-                                    // Right spacer with equal weight
-                                    Spacer()
-                                }
-                                .contentShape(Rectangle())  // Make entire area tappable
-                                .onTapGesture {
+                                Button {
                                     NSLog(
                                         "[Hoshu] File name tapped, controlData: \(controlData != nil), isParsingDeb: \(appState.isParsingDeb)"
                                     )
                                     showPackageInfoSheet = true
+                                } label: {
+                                    HStack {
+                                        // Left spacer to center the text
+                                        Spacer()
+
+                                        // Center: Filename + info icon
+                                        Text(
+                                            URL(fileURLWithPath: selectedPath)
+                                                .lastPathComponent
+                                                .cleanIOSFileSuffix()
+                                        )
+                                        .foregroundStyle(.white)
+
+                                        Image(systemName: "info.circle")
+                                            .foregroundStyle(.gray)
+                                            .font(.system(size: 14))
+
+                                        // Right spacer with equal weight
+                                        Spacer()
+                                    }
+                                    .contentShape(Rectangle())
                                 }
+                                .buttonStyle(.plain)
                             }
                         }
                         .frame(height: 30)  // Fixed height reserved for filename
@@ -1262,9 +1268,8 @@ struct ContentView: View {
                                                 > 0
                                                 && downloadETASeconds > 0
                                             {
-                                                let pct = String(
-                                                    format: "%.0f%%",
-                                                    downloadProgress * 100
+                                                let pct = formatPercent(
+                                                    downloadProgress
                                                 )
                                                 let speed =
                                                     formatBytes(
@@ -1286,9 +1291,8 @@ struct ContentView: View {
                                                     separator: " • "
                                                 )
                                             } else {
-                                                let pct = String(
-                                                    format: "%.0f%%",
-                                                    downloadProgress * 100
+                                                let pct = formatPercent(
+                                                    downloadProgress
                                                 )
                                                 var parts = [
                                                     "Downloading", pct,
@@ -1569,24 +1573,34 @@ extension ContentView {
             value /= 1024
             idx += 1
         }
-        return String(
-            format: idx == 0 ? "%.0f %@" : "%.1f %@",
-            value,
-            units[idx]
+        let formattedValue = value.formatted(
+            .number.precision(.fractionLength(idx == 0 ? 0 : 1))
         )
+        return "\(formattedValue) \(units[idx])"
+    }
+
+    private func formatPercent(_ value: Double) -> String {
+        "\(Int((value * 100).rounded()))%"
     }
 
     private func formatETA(_ seconds: Double) -> String {
         if seconds.isNaN || seconds.isInfinite || seconds <= 0 {
             return "ETA --"
         }
-        if seconds < 60 { return String(format: "ETA %.0fs", seconds) }
+        if seconds < 60 {
+            return "ETA \(Int(seconds.rounded()))s"
+        }
         let mins = Int(seconds / 60)
         let secs = Int(seconds) % 60
-        if mins < 60 { return String(format: "ETA %dm %02ds", mins, secs) }
+        if mins < 60 {
+            let paddedSeconds = secs.formatted(
+                .number.precision(.integerLength(2...))
+            )
+            return "ETA \(mins)m \(paddedSeconds)s"
+        }
         let hours = mins / 60
         let remMins = mins % 60
-        return String(format: "ETA %dh %dm", hours, remMins)
+        return "ETA \(hours)h \(remMins)m"
     }
 
     private func startURLPreflight() {
