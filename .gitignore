@@ -2,9 +2,10 @@
 .vscode
 .DS_Store
 
+xcuserdata
+xcuserdata/*
 *.xcuserstate
-project.xcworkspace/
-xcuserdata/
+UserInterfaceState.xcuserstate
 
 buildServer.json
 
