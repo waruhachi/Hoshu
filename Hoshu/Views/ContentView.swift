@@ -68,12 +68,13 @@ struct AlternativeFilePicker: View {
     }
 
     struct FileItem: Identifiable {
-        var id = UUID()
         var name: String
         var path: String
         var isDirectory: Bool
         var modificationDate: Date?
         var size: Int64 = 0
+
+        var id: String { path }
 
         var iconName: String {
             return isDirectory ? "folder.fill" : "doc.fill"
@@ -559,6 +560,11 @@ extension String {
     }
 }
 
+private struct DownloadErrorAlert: Identifiable {
+    let id = UUID()
+    let message: String
+}
+
 struct ContentView: View {
     @State private var isFilePickerPresented = false
     @State private var isAlternativeFilePickerPresented = false
@@ -576,7 +582,7 @@ struct ContentView: View {
     @State private var showURLImportPrompt = false
     @State private var urlToImport: String = ""
     @State private var isDownloading = false
-    @State private var downloadErrorMessage: String? = nil
+    @State private var downloadErrorAlert: DownloadErrorAlert? = nil
     @State private var downloadProgress: Double = 0.0  // 0.0 - 1.0
     @State private var isPreflighting = false
     @State private var downloadSpeedBytesPerSec: Double = 0
@@ -1447,19 +1453,21 @@ struct ContentView: View {
             }
             .onAppear {
                 // Initialize the notification handler here
-                notificationHandler = DebFileNotificationHandler { fileURL in
-                    self.handleOpenedFile(fileURL: fileURL)
+                if notificationHandler == nil {
+                    notificationHandler = DebFileNotificationHandler {
+                        fileURL in
+                        self.handleOpenedFile(fileURL: fileURL)
+                    }
                 }
-
-                NotificationCenter.default.addObserver(
-                    forName: Notification.Name("hoshuclearSelectedFile"),
-                    object: nil,
-                    queue: .main
-                ) { _ in
-                    selectedFilePath = nil
-                    conversionCompleted = false
-                    controlData = nil
-                }
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: Notification.Name("hoshuclearSelectedFile")
+                )
+            ) { _ in
+                selectedFilePath = nil
+                conversionCompleted = false
+                controlData = nil
             }
             .alert("Rootless Package Detected", isPresented: $showRootlessAlert)
         {
@@ -1492,13 +1500,12 @@ struct ContentView: View {
                 Text("Enter a URL. We'll verify and download the .deb.")
             }
             // Download error alert
-            .alert(
-                "Download Failed",
-                isPresented: .constant(downloadErrorMessage != nil)
-            ) {
-                Button("OK", role: .cancel) { downloadErrorMessage = nil }
-            } message: {
-                Text(downloadErrorMessage ?? "Unknown error")
+            .alert(item: $downloadErrorAlert) { alert in
+                Alert(
+                    title: Text("Download Failed"),
+                    message: Text(alert.message),
+                    dismissButton: .default(Text("OK"))
+                )
             }
     }
 }
@@ -1570,7 +1577,7 @@ extension ContentView {
         showURLImportPrompt = false
         isPreflighting = true
         downloadProgress = 0
-        downloadErrorMessage = nil
+        downloadErrorAlert = nil
         downloadedBytes = 0
         downloadSpeedBytesPerSec = 0
         downloadETASeconds = 0
@@ -1760,7 +1767,7 @@ extension ContentView {
     }
 
     private func handleDownloadError(_ message: String) {
-        downloadErrorMessage = message
+        downloadErrorAlert = DownloadErrorAlert(message: message)
         isDownloading = false
         isPreflighting = false
         appState.isParsingDeb = false
