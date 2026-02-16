@@ -1696,6 +1696,7 @@ extension ContentView {
         headTask.resume()
     }
 
+    @MainActor
     private func startDownloadWithRetry(url: URL, resolvedFilename: String) {
         retryAttempt = 0
         retryTask?.cancel()
@@ -1707,6 +1708,7 @@ extension ContentView {
         )
     }
 
+    @MainActor
     private func attemptDownload(
         url: URL,
         resolvedFilename: String,
@@ -1721,6 +1723,7 @@ extension ContentView {
         )
     }
 
+    @MainActor
     private func beginDownload(url: URL, resolvedFilename: String, attempt: Int)
     {
         isDownloading = true
@@ -1783,13 +1786,19 @@ extension ContentView {
                     Task { @MainActor in handleDownloadError("No data") }
                     return
                 }
-                finalizeDownload(tempURL: tempURL, filename: resolvedFilename)
+                Task { @MainActor in
+                    finalizeDownload(
+                        tempURL: tempURL,
+                        filename: resolvedFilename
+                    )
+                }
             }
         )
         activeDownloader = downloader
         downloader.start(url: url)
     }
 
+    @MainActor
     private func finalizeDownload(tempURL: URL, filename: String) {
         let fileManager = FileManager.default
         let cleanedName = filename.cleanIOSFileSuffix()
@@ -1814,6 +1823,7 @@ extension ContentView {
         }
     }
 
+    @MainActor
     private func handleDownloadError(_ message: String) {
         downloadErrorAlert = DownloadErrorAlert(message: message)
         retryTask?.cancel()
@@ -1919,6 +1929,7 @@ extension DebURLDownloader {
 
 // MARK: - Cancellation & Transient Error Helpers
 extension ContentView {
+    @MainActor
     private func cancelDownload() {
         cancelRequested = true
         retryTask?.cancel()

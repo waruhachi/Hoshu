@@ -1,6 +1,7 @@
 import AuxiliaryExecute
 import Foundation
 
+@MainActor
 final class DebConversionExecutor {
     private var isRunning = false
     private var didComplete = false
@@ -47,9 +48,7 @@ final class DebConversionExecutor {
                 }
             } ?? []
 
-        executionTask = Task.detached(priority: .userInitiated) { [weak self] in
-            guard let self = self else { return }
-
+        executionTask = Task.detached(priority: .userInitiated) {
             AuxiliaryExecute.spawn(
                 command: "/var/jb/usr/local/bin/rootless-patcher",
                 args: [filePath],
