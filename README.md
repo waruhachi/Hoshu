@@ -15,6 +15,10 @@
   </p>
 </div>
 
+<div align="center">
+  <img src="Resources/Preview.png" alt="Hoshu Preview" width="900" />
+</div>
+
 ## About The Project
 
 Hoshu is an iOS utility focused on converting `.deb` packages, especially for rootless jailbreak workflows.
