@@ -1,6 +1,6 @@
 Package: moe.waru.hoshu
 Name: Hoshu
-Version: 1.0
+Version: 1.0.0
 Architecture: iphoneos-arm
 Depends: firmware (>= 15.0), com.nightwind.rootless-patcher
 Description: a GUI wrapper for Nightwind's rootless-patcher
