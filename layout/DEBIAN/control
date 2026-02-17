@@ -7,6 +7,6 @@ Description: a GUI wrapper for Nightwind's rootless-patcher
 Maintainer: waruhachi
 Author: waruhachi
 Section: Utilities
-Icon: https://github.com/waruhachi/Hoshu/blob/master/Hoshu.png?raw=true
+Icon: https://github.com/waruhachi/Hoshu/blob/main/Resources/Hoshu.png?raw=true
 Depiction: https://github.com/waruhachi/Hoshu
 Support: https://github.com/waruhachi/Hoshu
