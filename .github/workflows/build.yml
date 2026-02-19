@@ -97,7 +97,7 @@ jobs:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                 tag_name: ${{ github.event.release.tag_name }}
-                name: ${{ github.event.repository.name }}
+                name: v${{ github.event.release.tag_name }}
                 body_path: release_body.md
                 files: packages/*.deb
                 draft: false
